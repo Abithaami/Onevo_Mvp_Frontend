@@ -4,6 +4,9 @@ import { navItems } from './data/onevoData';
 import LoginPage from './pages/LoginPage';
 import LandingLayout from './pages/landing/sections/LandingLayout';
 import LandingPage from './pages/landing/sections/LandingPage';
+import { normalizeWorkspaceSetup } from './data/setupData';
+import OnboardingPage from './pages/onboarding/sections/OnboardingPage';
+import DashboardPage from './pages/dashboard/DashboardPage';
 import SocialConnectionsPage from './pages/social-connections/sections/SocialConnectionsPage';
 
 export default function Root() {
@@ -11,6 +14,7 @@ export default function Root() {
   const [activePage, setActivePage] = useState('landing');
   const [mode, setMode] = useState('sign-in');
   const [toast, setToast] = useState(null);
+  const [workspaceSetup, setWorkspaceSetup] = useState(null);
   const [loading, setLoading] = useState(null);
   const [login, setLogin] = useState({ email: '', password: '', remember: false });
   const [register, setRegister] = useState({ fullName: '', email: '', password: '', terms: false });
@@ -46,6 +50,25 @@ export default function Root() {
     window.setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
   }
 
+  function showOnboarding() {
+    setActivePage('onboarding');
+    setMenuOpen(false);
+    window.setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+  }
+
+  function showDashboard(payload) {
+    setWorkspaceSetup(normalizeWorkspaceSetup(payload));
+    setActivePage('dashboard');
+    setMenuOpen(false);
+    window.setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+  }
+
+  function handleSignOutFromDashboard() {
+    setWorkspaceSetup(null);
+    showLanding('#home');
+    showToast('You have been signed out.', 'info');
+  }
+
   function handleNavClick(event, item) {
     event.preventDefault();
 
@@ -74,7 +97,7 @@ export default function Root() {
     window.setTimeout(() => {
       setLoading(null);
       showToast('Login successful! Redirecting...', 'success');
-      showLanding('#home');
+      showOnboarding();
     }, 1200);
   }
 
@@ -129,6 +152,25 @@ export default function Root() {
     return <LandingPage onOpenLogin={showLogin} />;
   }
 
+  if (activePage === 'dashboard') {
+    return (
+      <>
+        <a className="skip-link" href="#dashboard">
+          Skip to content
+        </a>
+
+        <DashboardPage
+          setup={normalizeWorkspaceSetup(workspaceSetup)}
+          onSetupChange={setWorkspaceSetup}
+          onOpenConnections={showConnections}
+          onSignOut={handleSignOutFromDashboard}
+        />
+
+        <Toast toast={toast} />
+      </>
+    );
+  }
+
   if (activePage === 'connections') {
     return (
       <>
@@ -137,6 +179,20 @@ export default function Root() {
         </a>
 
         <SocialConnectionsPage onBackToLanding={showLanding} showToast={showToast} />
+
+        <Toast toast={toast} />
+      </>
+    );
+  }
+
+  if (activePage === 'onboarding') {
+    return (
+      <>
+        <a className="skip-link" href="#onboarding">
+          Skip to content
+        </a>
+
+        <OnboardingPage onBackToLanding={showLanding} onOpenConnections={showConnections} onCompleteOnboarding={showDashboard} />
 
         <Toast toast={toast} />
       </>

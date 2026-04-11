@@ -1,20 +1,17 @@
 import { useState } from 'react';
 import SourceLogo from '../../../components/SourceLogo';
-import { socialSources } from '../../../data/onevoData';
+import { socialMediaSources } from '../../../data/onevoData';
+
+function initialConnectionStatuses() {
+  return socialMediaSources.reduce((acc, source) => ({ ...acc, [source.id]: 'not-connected' }), {});
+}
 
 export default function SocialConnectionsPage({ embedded = false, onBackToLanding, showToast }) {
-  const [connections, setConnections] = useState({
-    instagram: 'not-connected',
-    facebook: 'not-connected',
-    'google-business': 'not-connected',
-    website: 'not-connected',
-    pos: 'not-connected',
-    'manual-upload': 'not-connected',
-  });
+  const [connections, setConnections] = useState(initialConnectionStatuses);
 
   const connectedCount = Object.values(connections).filter((status) => status === 'connected').length;
   const pendingCount = Object.values(connections).filter((status) => status === 'pending').length;
-  const readySignals = socialSources.filter((source) => connections[source.id] === 'connected').map((source) => source.signal);
+  const readySignals = socialMediaSources.filter((source) => connections[source.id] === 'connected').map((source) => source.signal);
   const PageTag = embedded ? 'section' : 'main';
 
   function handleConnect(source) {
@@ -55,15 +52,15 @@ export default function SocialConnectionsPage({ embedded = false, onBackToLandin
           <span className="summary-label">Signal readiness</span>
           <strong>{connectedCount} connected</strong>
           <p>{pendingCount} pending setup</p>
-          <div className="summary-meter" aria-label={`${connectedCount} of ${socialSources.length} sources connected`}>
-            <span style={{ width: `${(connectedCount / socialSources.length) * 100}%` }} />
+          <div className="summary-meter" aria-label={`${connectedCount} of ${socialMediaSources.length} sources connected`}>
+            <span style={{ width: `${(connectedCount / socialMediaSources.length) * 100}%` }} />
           </div>
         </aside>
       </section>
 
       <section className="connection-layout" aria-label="Available source connections">
         <div className="connection-grid">
-          {socialSources.map((source) => {
+          {socialMediaSources.map((source) => {
             const status = connections[source.id];
             const connected = status === 'connected';
             const pending = status === 'pending';

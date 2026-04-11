@@ -30,6 +30,18 @@ export default function SourceLogo({ id, name }) {
     );
   }
 
+  if (id === 'linkedin') {
+    return (
+      <svg className="source-logo" viewBox="0 0 64 64" role="img" aria-label={`${name} logo`}>
+        <rect x="10" y="10" width="44" height="44" rx="11" fill="#0A66C2" />
+        <path
+          d="M22.5 26.5h5.2V45h-5.2V26.5zm2.6-8.2a3 3 0 1 1-3 3 3 3 0 0 1 3-3zM38.2 26.2c5 0 6.8 3.3 6.8 7.6V45h-5v-9.2c0-2.2 0-5-3.1-5-3.1 0-3.6 2.4-3.6 4.8V45h-5V26.5h4.8v2.1h.1c.7-1.4 2.5-2.4 4.9-2.4z"
+          fill="#FFFFFF"
+        />
+      </svg>
+    );
+  }
+
   if (id === 'google-business') {
     return (
       <svg className="source-logo" viewBox="0 0 64 64" role="img" aria-label={`${name} logo`}>
@@ -61,6 +73,17 @@ export default function SourceLogo({ id, name }) {
         <rect x="14" y="12" width="36" height="40" rx="8" fill="#3B82F6" />
         <rect x="20" y="18" width="24" height="12" rx="3" fill="#D7FBF5" />
         <path d="M22 38h20M22 44h14" stroke="#FFFFFF" strokeWidth="4" strokeLinecap="round" />
+      </svg>
+    );
+  }
+
+  if (id === 'booking') {
+    return (
+      <svg className="source-logo" viewBox="0 0 64 64" role="img" aria-label={`${name} logo`}>
+        <rect x="12" y="14" width="40" height="38" rx="10" fill="#0EA5A4" />
+        <rect x="18" y="20" width="28" height="22" rx="4" fill="#E6FFFA" opacity="0.95" />
+        <path d="M22 28h20M22 34h14M22 40h18" stroke="#082529" strokeWidth="2.5" strokeLinecap="round" />
+        <circle cx="44" cy="24" r="4" fill="#FF6B5A" />
       </svg>
     );
   }

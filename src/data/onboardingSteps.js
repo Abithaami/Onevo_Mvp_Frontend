@@ -1,0 +1,43 @@
+/** Static copy + assets for the three onboarding steps. */
+export const onboardingSteps = [
+  {
+    id: 'brand',
+    number: '01',
+    title: 'Brand DNA details',
+    eyebrow: 'Step 01',
+    heading: 'Teach ONEVO how your business sounds, sells, and serves.',
+    description: 'Use your website to extract a starting profile, or enter brand details manually.',
+    evidence: ['Website or manual entry', 'Business offering', 'Audience context'],
+    image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1200&q=80',
+    imageAlt: 'Team discussing business positioning and audience goals.',
+    kicker: 'Brand clarity improves recommendation relevance',
+    prompts: ['Website URL extract', 'Manual brand fields', 'Offer and service context'],
+  },
+  {
+    id: 'growth',
+    number: '02',
+    title: 'Data-driven growth details',
+    eyebrow: 'Step 02',
+    heading: 'Define the outcomes and signals that matter most right now.',
+    description:
+      'Connect Google Business, POS, or booking when you use them—or upload an Excel sheet or image. Goals and metrics stay the core.',
+    evidence: ['Systems or uploads', 'Outcome tracking', 'Approval-first workflow'],
+    image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80',
+    imageAlt: 'Analytics dashboard showing business performance metrics.',
+    kicker: 'Goals and outcomes create a smarter ranking loop',
+    prompts: ['POS / Google / Booking', 'Excel or image fallback', 'Growth priority & metrics'],
+  },
+  {
+    id: 'connections',
+    number: '03',
+    title: 'Social media connection',
+    eyebrow: 'Step 03',
+    heading: 'Connect Facebook, Instagram, and LinkedIn for social signals.',
+    description: 'OAuth with each network can be completed after setup. Only these three social channels are used here.',
+    evidence: ['Facebook & Instagram & LinkedIn', 'Signal collection hub', 'OAuth after setup'],
+    image: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?auto=format&fit=crop&w=1200&q=80',
+    imageAlt: 'Phone screen displaying social media applications.',
+    kicker: 'Connected sources are the start of signal collection',
+    prompts: ['Facebook', 'Instagram', 'LinkedIn'],
+  },
+];

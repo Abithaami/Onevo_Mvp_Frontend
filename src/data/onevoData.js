@@ -4,7 +4,6 @@ export const navItems = [
   { href: '#services', label: 'Services' },
   { href: '#plans', label: 'Plans' },
   { href: '#stories', label: 'Stories' },
-  // { href: '#connections', label: 'Connect', page: 'connections' },
   { href: '#contact', label: 'Contact' },
   { href: '#access', label: 'Login', page: 'login' },
 ];
@@ -87,7 +86,8 @@ export const reviews = [
   },
 ];
 
-export const socialSources = [
+/** Step 3 — social networks only (Facebook, Instagram, LinkedIn). */
+export const socialMediaSources = [
   {
     id: 'instagram',
     name: 'Instagram',
@@ -105,32 +105,36 @@ export const socialSources = [
     recommended: true,
   },
   {
-    id: 'google-business',
-    name: 'Google Business Profile',
-    type: 'Local discovery',
-    description: 'Use reviews, visibility, and customer discovery signals for local growth.',
-    signal: 'Reviews, profile activity',
+    id: 'linkedin',
+    name: 'LinkedIn',
+    type: 'Social',
+    description: 'Pull in company page updates, comments, and professional audience signals.',
+    signal: 'Page posts, comments, messages',
     recommended: true,
   },
+];
+
+/** Step 2 — business systems to connect when available. */
+export const growthIntegrationSources = [
   {
-    id: 'website',
-    name: 'Website',
-    type: 'Owned channel',
-    description: 'Capture contact intent, page interest, and lead-form context.',
-    signal: 'Forms, traffic, intent',
+    id: 'google-business',
+    name: 'Google Business Profile',
+    type: 'Local & reviews',
+    description: 'Reviews, maps visibility, and profile activity.',
+    signal: 'Reviews, profile activity',
   },
   {
     id: 'pos',
-    name: 'POS or booking data',
+    name: 'POS system',
     type: 'Operations',
-    description: 'Add bookings, sales patterns, repeat visits, and slow-period signals.',
-    signal: 'Sales, bookings, repeat visits',
+    description: 'Sales and visit patterns from your point of sale.',
+    signal: 'Sales, receipts, visits',
   },
   {
-    id: 'manual-upload',
-    name: 'Manual uploads',
-    type: 'Fallback',
-    description: 'Upload notes or CSV exports when platform integrations are not ready yet.',
-    signal: 'CSV, notes, exports',
+    id: 'booking',
+    name: 'Booking system',
+    type: 'Operations',
+    description: 'Appointments, reservations, and capacity signals.',
+    signal: 'Bookings, cancellations',
   },
 ];
