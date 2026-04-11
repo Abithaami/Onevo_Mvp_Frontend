@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { googleOAuthLoginUrl } from '../lib/apiBase.js';
 
 function EyeIcon({ visible }) {
   if (visible) {
@@ -120,7 +121,7 @@ function AuthPanel({ mode, selectMode, login, setLogin, register, setRegister, l
                 <span>Or continue with</span>
               </div>
               <div className="social-grid">
-                <a className="social-btn" href="/api/auth/google/login" aria-label="Continue with Google">
+                <a className="social-btn" href={googleOAuthLoginUrl()} aria-label="Continue with Google">
                   <GoogleIcon />
                 </a>
               </div>

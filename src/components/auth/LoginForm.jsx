@@ -1,5 +1,6 @@
 import PasswordField from './PasswordField.jsx';
 import { GoogleIcon } from './AuthIcons.jsx';
+import { googleOAuthLoginUrl } from '../../lib/apiBase.js';
 
 export default function LoginForm({ login, setLogin, loading, onSubmit, onShowToast }) {
   return (
@@ -54,7 +55,7 @@ export default function LoginForm({ login, setLogin, loading, onSubmit, onShowTo
           </div>
 
           <div className="social-grid">
-            <a className="social-btn" href="/api/auth/google/login" aria-label="Continue with Google">
+            <a className="social-btn" href={googleOAuthLoginUrl()} aria-label="Continue with Google">
               <GoogleIcon />
             </a>
           </div>
