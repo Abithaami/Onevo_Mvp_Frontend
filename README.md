@@ -1,4 +1,4 @@
-# Onevo MVP Frontend
+# Onevo Frontend
 
 React version of the Onevo authentication design.
 

@@ -1,0 +1,97 @@
+/* Approval queue — page chrome; recommendation cards use shared workbench (src/components/workbench) */
+
+.ap-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-bottom: var(--spacing-2xl);
+}
+
+.ap-page-header {
+  margin-bottom: var(--spacing-xl);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ap-page-title {
+  margin: 0 0 var(--spacing-xs);
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.ap-page-lead {
+  margin: 0;
+  max-width: 40rem;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-base);
+  line-height: 1.55;
+}
+
+.ap-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xl);
+}
+
+.ap-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: 0.45rem 0.9rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ap-filter:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--color-text-primary);
+}
+
+.ap-filter.active {
+  border-color: rgba(96, 165, 255, 0.45);
+  background: rgba(96, 165, 255, 0.12);
+  color: #fff;
+}
+
+.ap-filter-count {
+  min-width: 1.25rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.35);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.ap-filter.active .ap-filter-count {
+  color: var(--color-accent);
+}
+
+.ap-queue {
+  display: grid;
+  gap: var(--spacing-lg);
+}
+
+/* Empty state (aligned with dashboard .db-empty) */
+.db-empty {
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--color-border);
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.db-empty-hint {
+  margin: var(--spacing-xs) 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
