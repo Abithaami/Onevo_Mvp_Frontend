@@ -2,3 +2,5 @@ node_modules
 dist
 .env
 .env.local
+.vite-dev*.log
+.tmp_2nd_brain
