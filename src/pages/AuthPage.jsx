@@ -1,19 +1,28 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../auth/AuthProvider.jsx';
+import { useWorkspaceState } from '../auth/WorkspaceStateProvider.jsx';
 import LoginForm from '../components/auth/LoginForm.jsx';
 import RegisterForm from '../components/auth/RegisterForm.jsx';
 import ToastAlert from '../components/auth/ToastAlert.jsx';
 import { OnevoLogo } from '../components/auth/AuthIcons.jsx';
 
-const POST_AUTH_REDIRECT_MS = 900;
-
+/**
+ * Real auth: Google OAuth (cookie session) + `GET /api/auth/google/session` via `AuthProvider`.
+ * Email/password are not offered as live flows — Google only.
+ */
 export default function AuthPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { status, error, refreshSession } = useAuth();
+  const ws = useWorkspaceState();
   const [mode, setMode] = useState('sign-in');
   const [toast, setToast] = useState(null);
-  const [loading, setLoading] = useState(null);
-  const [login, setLogin] = useState({ email: '', password: '', remember: false });
-  const [register, setRegister] = useState({ fullName: '', email: '', password: '', terms: false });
+  const prevPathRef = useRef(null);
+
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const googleLoginReturnUrl = `${origin}/app/dashboard`;
+  const googleRegisterReturnUrl = `${origin}/app/onboarding`;
 
   function showToast(message, type = 'info') {
     setToast({ message, type });
@@ -25,99 +34,144 @@ export default function AuthPage() {
     setToast(null);
   }
 
-  function handleLoginSubmit(event) {
-    event.preventDefault();
+  /** Default to Sign in when navigating onto /auth (e.g. after sign-out); keep mode while staying on the page. */
+  useEffect(() => {
+    const path = location.pathname;
+    if (path === '/auth' && prevPathRef.current !== '/auth') {
+      setMode('sign-in');
+      setToast(null);
+    }
+    prevPathRef.current = path;
+  }, [location.pathname]);
 
-    if (!login.email.trim() || !login.password.trim()) {
-      showToast('Please enter both email and password.', 'error');
+  useEffect(() => {
+    if (status !== 'authenticated') {
       return;
     }
+    if (ws.status === 'idle' || ws.status === 'loading') {
+      return;
+    }
+    if (ws.status === 'ready') {
+      navigate(ws.serverOnboardingComplete ? '/app/dashboard' : '/app/onboarding', { replace: true });
+      return;
+    }
+    navigate('/app/dashboard', { replace: true });
+  }, [status, ws.status, ws.serverOnboardingComplete, navigate]);
 
-    setLoading('login');
-    window.setTimeout(() => {
-      setLoading(null);
-      showToast('Login successful! Redirecting...', 'success');
-      window.setTimeout(() => navigate('/app/dashboard', { replace: true }), POST_AUTH_REDIRECT_MS);
-    }, 1200);
+  if (status === 'loading') {
+    return (
+      <div className="auth-page auth-page--loading" aria-busy="true" aria-label="Checking session">
+        <div className="auth-page__ambient" aria-hidden="true" />
+        <div className="auth-page__loading-inner">
+          <OnevoLogo className="auth-page__loading-logo" />
+          <p className="auth-page__loading-text">Checking your session…</p>
+        </div>
+      </div>
+    );
   }
 
-  function handleRegisterSubmit(event) {
-    event.preventDefault();
-
-    if (!register.fullName.trim() || !register.email.trim() || !register.password.trim()) {
-      showToast('Please fill in all required fields.', 'error');
-      return;
-    }
-
-    if (register.password.length < 8) {
-      showToast('Password must be at least 8 characters long.', 'error');
-      return;
-    }
-
-    if (!register.terms) {
-      showToast('Please agree to the Terms of Service.', 'error');
-      return;
-    }
-
-    setLoading('register');
-    window.setTimeout(() => {
-      setLoading(null);
-      showToast('Account created! Taking you to onboarding…', 'success');
-      window.setTimeout(() => navigate('/app/onboarding', { replace: true }), POST_AUTH_REDIRECT_MS);
-    }, 1200);
+  if (status === 'authenticated') {
+    return (
+      <div className="auth-page auth-page--loading" aria-busy="true" aria-label="Loading workspace">
+        <div className="auth-page__ambient" aria-hidden="true" />
+        <div className="auth-page__loading-inner">
+          <OnevoLogo className="auth-page__loading-logo" />
+          <p className="auth-page__loading-text">Loading your workspace…</p>
+        </div>
+      </div>
+    );
   }
+
+  const isSignIn = mode === 'sign-in';
 
   return (
     <>
-      <a href="/" className="brand" aria-label="Onevo Home">
-        <OnevoLogo />
-        <span>Onevo</span>
-      </a>
+      <div className="auth-page">
+        <div className="auth-page__ambient" aria-hidden="true" />
 
-      <main className="page" aria-label="Authentication page">
-        <section className="hero">
-          <h1>
-            <span className="accent">Onevo</span> turns signals into action
-          </h1>
-          <p>Bring goals, insights, and next steps into one focused workspace so your team always knows what to do next.</p>
-          <small>Signal-to-action workspace</small>
-        </section>
+        <header className="auth-page__header">
+          <Link to="/" className="auth-page__logo-link" aria-label="Onevo home">
+            <OnevoLogo className="auth-page__logo-mark" />
+            <span className="auth-page__logo-text">ONEVO</span>
+          </Link>
+        </header>
 
-        <section className="card" role="main" aria-label="Login and registration form">
-          <div className="panel">
-            <div className="tabs" role="tablist" aria-label="Authentication mode">
-              <button
-                className={`tab ${mode === 'sign-in' ? 'active' : ''}`}
-                type="button"
-                role="tab"
-                aria-selected={mode === 'sign-in'}
-                aria-controls="login-panel"
-                id="tab-login"
-                onClick={() => selectMode('sign-in')}
-              >
-                Sign in
-              </button>
-              <button
-                className={`tab ${mode === 'create-account' ? 'active' : ''}`}
-                type="button"
-                role="tab"
-                aria-selected={mode === 'create-account'}
-                aria-controls="register-panel"
-                id="tab-register"
-                onClick={() => selectMode('create-account')}
-              >
-                Create account
-              </button>
+        <div className="auth-page__grid">
+          <div className="auth-page__brand">
+            <p className="auth-page__eyebrow">Workspace access</p>
+            <h1 className="auth-page__title">{isSignIn ? 'Welcome back' : 'Create your workspace'}</h1>
+            <p className="auth-page__lede">
+              {isSignIn
+                ? 'Pick up where you left off—continue with Google to return to your dashboard.'
+                : 'Start with Google. New workspaces open in onboarding so ONEVO can learn your business.'}
+            </p>
+            <ul className="auth-page__bullets">
+              {isSignIn ? (
+                <>
+                  <li>Resume your dashboard and saved setup</li>
+                  <li>One sign-in—no extra password for ONEVO yet</li>
+                </>
+              ) : (
+                <>
+                  <li>Guided onboarding in a few focused steps</li>
+                  <li>Google keeps sign-in simple and familiar</li>
+                </>
+              )}
+            </ul>
+            <Link to="/" className="auth-page__back-link">
+              ← Back to marketing site
+            </Link>
+          </div>
+
+          <div className="auth-page__panel-wrap">
+            {error === 'session_network' ? (
+              <div className="auth-page__alert" role="status">
+                <strong>Can’t reach the API.</strong> Start the backend and check <code>VITE_API_BASE_URL</code> / the dev
+                proxy, then{' '}
+                <button type="button" className="auth-page__alert-retry" onClick={() => refreshSession()}>
+                  retry
+                </button>
+                .
+              </div>
+            ) : null}
+
+            <div className="auth-panel">
+              <div className="auth-tabs" role="tablist" aria-label="Authentication mode">
+                <button
+                  className={`auth-tab ${isSignIn ? 'auth-tab--active' : ''}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={isSignIn}
+                  aria-controls="login-panel"
+                  id="tab-login"
+                  onClick={() => selectMode('sign-in')}
+                >
+                  Sign in
+                </button>
+                <button
+                  className={`auth-tab ${!isSignIn ? 'auth-tab--active' : ''}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={!isSignIn}
+                  aria-controls="register-panel"
+                  id="tab-register"
+                  onClick={() => selectMode('create-account')}
+                >
+                  Create account
+                </button>
+              </div>
+
+              {isSignIn ? (
+                <LoginForm googleReturnUrl={googleLoginReturnUrl} onShowToast={showToast} />
+              ) : (
+                <RegisterForm googleReturnUrl={googleRegisterReturnUrl} onShowToast={showToast} />
+              )}
             </div>
 
-            {mode === 'sign-in' ? (
-              <LoginForm login={login} setLogin={setLogin} loading={loading} onSubmit={handleLoginSubmit} onShowToast={showToast} />
-            ) : (
-              <RegisterForm register={register} setRegister={setRegister} loading={loading} onSubmit={handleRegisterSubmit} />
-            )}
+            <p className="auth-page__session-note">Session cookie on your API host after Google—standard for this app.</p>
           </div>
-        </section>
-      </main>
+        </div>
+      </div>
 
       <ToastAlert toast={toast} />
     </>

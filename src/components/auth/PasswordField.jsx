@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { EyeIcon } from './AuthIcons.jsx';
 
-export default function PasswordField({ id, label, placeholder, autoComplete, value, onChange }) {
+export default function PasswordField({ id, label, placeholder, autoComplete, value, onChange, disabled }) {
   const [visible, setVisible] = useState(false);
 
   return (
@@ -13,11 +13,13 @@ export default function PasswordField({ id, label, placeholder, autoComplete, va
           type={visible ? 'text' : 'password'}
           name="password"
           placeholder={placeholder}
-          required
+          required={!disabled}
           autoComplete={autoComplete}
-          aria-required="true"
+          aria-required={!disabled}
           value={value}
           onChange={onChange}
+          disabled={disabled}
+          aria-disabled={disabled ? 'true' : undefined}
         />
         <button
           type="button"

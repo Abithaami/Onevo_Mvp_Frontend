@@ -1,66 +1,31 @@
-import PasswordField from './PasswordField.jsx';
 import { GoogleIcon } from './AuthIcons.jsx';
 import { googleOAuthLoginUrl } from '../../lib/apiBase.js';
 
-export default function LoginForm({ login, setLogin, loading, onSubmit, onShowToast }) {
+export default function LoginForm({ googleReturnUrl, onShowToast }) {
   return (
-    <form id="loginForm" autoComplete="on" role="tabpanel" aria-labelledby="tab-login" onSubmit={onSubmit}>
-      <div className="form-shell" id="login-panel">
-        <div className="field">
-          <label htmlFor="email">Email Address</label>
-          <input
-            id="email"
-            type="email"
-            name="email"
-            placeholder="you@example.com"
-            required
-            autoComplete="username"
-            aria-required="true"
-            value={login.email}
-            onChange={(event) => setLogin((current) => ({ ...current, email: event.target.value }))}
-          />
-        </div>
+    <div className="auth-mode-body" id="login-panel" role="tabpanel" aria-labelledby="tab-login">
+      <p className="auth-card-kicker">Continue with Google to return to your workspace.</p>
 
-        <PasswordField
-          id="password"
-          label="Password"
-          placeholder="Enter your password"
-          autoComplete="current-password"
-          value={login.password}
-          onChange={(event) => setLogin((current) => ({ ...current, password: event.target.value }))}
-        />
-
-        <div className="row">
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              name="remember"
-              checked={login.remember}
-              onChange={(event) => setLogin((current) => ({ ...current, remember: event.target.checked }))}
-            />
-            Remember me
-          </label>
-          <button className="link link-button" type="button" onClick={() => onShowToast('Password reset flow would open here.', 'info')}>
-            Forgot password?
-          </button>
-        </div>
-
-        <div className="actions">
-          <button type="submit" className={`primary-btn ${loading === 'login' ? 'loading' : ''}`}>
-            {loading === 'login' ? 'Signing in...' : 'Sign in'}
-          </button>
-
-          <div className="divider">
-            <span>Or continue with</span>
-          </div>
-
-          <div className="social-grid">
-            <a className="social-btn" href={googleOAuthLoginUrl()} aria-label="Continue with Google">
-              <GoogleIcon />
-            </a>
-          </div>
-        </div>
+      <div className="auth-google-stack">
+        <a className="primary-btn auth-google-primary auth-google-primary--lead" href={googleOAuthLoginUrl(googleReturnUrl)}>
+          <GoogleIcon />
+          Continue with Google
+        </a>
+        <p className="auth-google-caption">The only live sign-in path—opens your real session on the API.</p>
       </div>
-    </form>
+
+      <div className="auth-soon" aria-live="polite">
+        <p className="auth-soon__line">
+          Email and password aren’t available yet.
+          <button
+            type="button"
+            className="auth-soon__inline-btn"
+            onClick={() => onShowToast('Use Continue with Google. Email sign-in will ship when the API supports it.', 'info')}
+          >
+            Learn more
+          </button>
+        </p>
+      </div>
+    </div>
   );
 }

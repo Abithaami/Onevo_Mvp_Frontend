@@ -1,4 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import ToastAlert from '../../components/auth/ToastAlert.jsx';
+import RejectDraftModal from '../../components/workbench/RejectDraftModal.jsx';
 import RecommendationCard from '../../components/workbench/RecommendationCard.jsx';
 import { getMockApprovalQueue } from './mockApprovalQueue.js';
 import './approval.css';
@@ -10,23 +12,75 @@ const FILTERS = [
 ];
 
 export default function ApprovalQueueView() {
-  const allItems = useMemo(() => getMockApprovalQueue(), []);
+  const [queueItems, setQueueItems] = useState(() => getMockApprovalQueue());
   const [filter, setFilter] = useState('all');
+  const [toast, setToast] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
+
+  useEffect(() => {
+    if (!toast) {
+      return undefined;
+    }
+    const t = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  function showToast(message, type = 'info') {
+    setToast({ message, type });
+  }
 
   const items = useMemo(() => {
     if (filter === 'urgent') {
-      return allItems.filter((i) => i.urgency === 'high');
+      return queueItems.filter((i) => i.urgency === 'high');
     }
     if (filter === 'normal') {
-      return allItems.filter((i) => i.urgency === 'normal');
+      return queueItems.filter((i) => i.urgency === 'normal');
     }
-    return allItems;
-  }, [allItems, filter]);
+    return queueItems;
+  }, [queueItems, filter]);
+
+  function removeItem(id) {
+    setQueueItems((prev) => prev.filter((i) => i.id !== id));
+  }
 
   function handleAction(id, action) {
-    void id;
-    void action;
-    // TODO: PATCH approval API
+    const item = queueItems.find((i) => i.id === id);
+    const title = item?.title ?? 'This item';
+
+    if (action === 'reject') {
+      setRejectTarget({ id, title });
+      return;
+    }
+
+    if (action === 'approve') {
+      removeItem(id);
+      showToast(`Approved: ${title}`, 'success');
+      return;
+    }
+
+    if (action === 'later') {
+      removeItem(id);
+      showToast(`Saved for later — ${title}`, 'info');
+      return;
+    }
+
+    if (action === 'edit') {
+      showToast('Editor will open here when the draft API is connected.', 'info');
+      return;
+    }
+
+    if (action === 'details') {
+      showToast('Full details view — coming with API wiring.', 'info');
+    }
+  }
+
+  function confirmReject() {
+    if (!rejectTarget) {
+      return;
+    }
+    removeItem(rejectTarget.id);
+    showToast(`Rejected — ${rejectTarget.title}`, 'error');
+    setRejectTarget(null);
   }
 
   return (
@@ -48,11 +102,11 @@ export default function ApprovalQueueView() {
           >
             {f.label}
             {f.id === 'all' ? (
-              <span className="ap-filter-count">{allItems.length}</span>
+              <span className="ap-filter-count">{queueItems.length}</span>
             ) : f.id === 'urgent' ? (
-              <span className="ap-filter-count">{allItems.filter((i) => i.urgency === 'high').length}</span>
+              <span className="ap-filter-count">{queueItems.filter((i) => i.urgency === 'high').length}</span>
             ) : (
-              <span className="ap-filter-count">{allItems.filter((i) => i.urgency === 'normal').length}</span>
+              <span className="ap-filter-count">{queueItems.filter((i) => i.urgency === 'normal').length}</span>
             )}
           </button>
         ))}
@@ -61,8 +115,12 @@ export default function ApprovalQueueView() {
       <div className="ap-queue">
         {items.length === 0 ? (
           <div className="db-empty">
-            <p>Nothing in this view.</p>
-            <p className="db-empty-hint">Try another filter or check back when new drafts arrive.</p>
+            <p>{queueItems.length === 0 ? 'Your queue is clear.' : 'Nothing in this view.'}</p>
+            <p className="db-empty-hint">
+              {queueItems.length === 0
+                ? 'New drafts will show up here when Onevo generates them.'
+                : 'Try another filter or check back when new drafts arrive.'}
+            </p>
           </div>
         ) : (
           items.map((item) => (
@@ -70,6 +128,15 @@ export default function ApprovalQueueView() {
           ))
         )}
       </div>
+
+      <RejectDraftModal
+        open={!!rejectTarget}
+        title={rejectTarget?.title ?? ''}
+        onCancel={() => setRejectTarget(null)}
+        onConfirm={confirmReject}
+      />
+
+      <ToastAlert toast={toast} />
     </div>
   );
 }
