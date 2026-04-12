@@ -1,88 +1,33 @@
-import PasswordField from './PasswordField.jsx';
+import { GoogleIcon } from './AuthIcons.jsx';
+import { googleOAuthLoginUrl } from '../../lib/apiBase.js';
 
-export default function RegisterForm({ register, setRegister, loading, onSubmit }) {
+export default function RegisterForm({ googleReturnUrl, onShowToast }) {
   return (
-    <form id="registerForm" autoComplete="on" role="tabpanel" aria-labelledby="tab-register" onSubmit={onSubmit}>
-      <div className="form-shell" id="register-panel">
-        <div className="field">
-          <label htmlFor="fullName">Full Name</label>
-          <input
-            id="fullName"
-            type="text"
-            name="fullName"
-            placeholder="John Doe"
-            required
-            autoComplete="name"
-            aria-required="true"
-            value={register.fullName}
-            onChange={(event) => setRegister((current) => ({ ...current, fullName: event.target.value }))}
-          />
-        </div>
+    <div className="auth-mode-body" id="register-panel" role="tabpanel" aria-labelledby="tab-register">
+      <p className="auth-card-kicker">Start with Google—new workspaces begin in onboarding.</p>
 
-        <div className="field">
-          <label htmlFor="registerEmail">Email Address</label>
-          <input
-            id="registerEmail"
-            type="email"
-            name="email"
-            placeholder="you@example.com"
-            required
-            autoComplete="username"
-            aria-required="true"
-            value={register.email}
-            onChange={(event) => setRegister((current) => ({ ...current, email: event.target.value }))}
-          />
-        </div>
+      <div className="auth-google-stack">
+        <a className="primary-btn auth-google-primary auth-google-primary--lead" href={googleOAuthLoginUrl(googleReturnUrl)}>
+          <GoogleIcon />
+          Start with Google
+        </a>
+        <p className="auth-google-caption">Creates your tenant on first sign-in, then takes you into setup.</p>
+      </div>
 
-        <PasswordField
-          id="registerPassword"
-          label="Password"
-          placeholder="Create a strong password"
-          autoComplete="new-password"
-          value={register.password}
-          onChange={(event) => setRegister((current) => ({ ...current, password: event.target.value }))}
-        />
-
-        <div className="field">
-          <label className="checkbox">
-            <input
-              type="checkbox"
-              name="terms"
-              required
-              checked={register.terms}
-              onChange={(event) => setRegister((current) => ({ ...current, terms: event.target.checked }))}
-            />
-            <span>
-              I agree to the{' '}
-              <a className="link" href="/" onClick={(event) => event.preventDefault()}>
-                Terms of Service
-              </a>{' '}
-              and{' '}
-              <a className="link" href="/" onClick={(event) => event.preventDefault()}>
-                Privacy Policy
-              </a>
-            </span>
-          </label>
-        </div>
-
-        <div className="actions">
-          <button type="submit" className={`primary-btn ${loading === 'register' ? 'loading' : ''}`}>
-            {loading === 'register' ? 'Creating account...' : 'Create account'}
+      <div className="auth-soon" aria-live="polite">
+        <p className="auth-soon__line">
+          Manual email signup is coming soon.
+          <button
+            type="button"
+            className="auth-soon__inline-btn"
+            onClick={() =>
+              onShowToast('New accounts use Google for now—you’ll land in onboarding after sign-in.', 'info')
+            }
+          >
+            Learn more
           </button>
-        </div>
-
-        <p className="terms">
-          By creating an account, you agree to our
-          <br />
-          <a href="/" onClick={(event) => event.preventDefault()}>
-            Terms of Service
-          </a>{' '}
-          and{' '}
-          <a href="/" onClick={(event) => event.preventDefault()}>
-            Privacy Policy
-          </a>
         </p>
       </div>
-    </form>
+    </div>
   );
 }

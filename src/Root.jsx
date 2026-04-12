@@ -6,7 +6,7 @@ import LandingLayout from './pages/landing/sections/LandingLayout';
 import LandingPage from './pages/landing/sections/LandingPage';
 import { normalizeWorkspaceSetup } from './data/setupData';
 import OnboardingPage from './pages/onboarding/sections/OnboardingPage';
-import DashboardPage from './pages/dashboard/DashboardPage';
+import DashboardWorkspaceContent from './pages/dashboard/DashboardWorkspaceContent';
 import SocialConnectionsPage from './pages/social-connections/sections/SocialConnectionsPage';
 
 export default function Root() {
@@ -159,11 +159,11 @@ export default function Root() {
           Skip to content
         </a>
 
-        <DashboardPage
+        <DashboardWorkspaceContent
           setup={normalizeWorkspaceSetup(workspaceSetup)}
           onSetupChange={setWorkspaceSetup}
           onOpenConnections={showConnections}
-          onSignOut={handleSignOutFromDashboard}
+          activeNav="overview"
         />
 
         <Toast toast={toast} />

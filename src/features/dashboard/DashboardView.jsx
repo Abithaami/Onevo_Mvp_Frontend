@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import ToastAlert from '../../components/auth/ToastAlert.jsx';
+import RejectDraftModal from '../../components/workbench/RejectDraftModal.jsx';
 import AttentionZone from './zones/AttentionZone.jsx';
 import AiWorkbenchZone from './zones/AiWorkbenchZone.jsx';
 import BusinessSnapshotZone from './zones/BusinessSnapshotZone.jsx';
@@ -13,11 +15,71 @@ import './dashboard.css';
 export default function DashboardView() {
   const { loading, error, model, retry } = useDashboardScreen();
   const [handoffDismissed, setHandoffDismissed] = useState(false);
+  const [dismissedRecIds, setDismissedRecIds] = useState(() => new Set());
+  const [toast, setToast] = useState(null);
+  const [rejectTarget, setRejectTarget] = useState(null);
+
+  useEffect(() => {
+    if (!toast) {
+      return undefined;
+    }
+    const t = window.setTimeout(() => setToast(null), 4000);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+
+  function showToast(message, type = 'info') {
+    setToast({ message, type });
+  }
+
+  const workbenchItems = useMemo(() => {
+    if (!model?.recommendations?.length) {
+      return [];
+    }
+    return model.recommendations.filter((r) => !dismissedRecIds.has(r.id));
+  }, [model, dismissedRecIds]);
+
+  function dismissRecommendation(id) {
+    setDismissedRecIds((prev) => new Set([...prev, id]));
+  }
 
   function onRecommendationAction(id, action) {
-    void id;
-    void action;
-    // TODO: call approval / orchestration API
+    const item = model?.recommendations?.find((r) => r.id === id);
+    const title = item?.title ?? 'This item';
+
+    if (action === 'reject') {
+      setRejectTarget({ id, title });
+      return;
+    }
+
+    if (action === 'approve') {
+      dismissRecommendation(id);
+      showToast(`Approved — ${title}`, 'success');
+      return;
+    }
+
+    if (action === 'later') {
+      dismissRecommendation(id);
+      showToast(`Saved for later — ${title}`, 'info');
+      return;
+    }
+
+    if (action === 'edit') {
+      showToast('Editor will open here when the draft API is connected.', 'info');
+      return;
+    }
+
+    if (action === 'details') {
+      showToast('Full details — coming with API wiring.', 'info');
+    }
+  }
+
+  function confirmReject() {
+    if (!rejectTarget) {
+      return;
+    }
+    dismissRecommendation(rejectTarget.id);
+    showToast(`Rejected — ${rejectTarget.title}`, 'error');
+    setRejectTarget(null);
   }
 
   function dismissHandoff() {
@@ -55,10 +117,22 @@ export default function DashboardView() {
       ) : null}
 
       <AttentionZone coach={model.attention.coach} alerts={model.attention.alerts} />
-      <AiWorkbenchZone items={model.recommendations} onRecommendationAction={onRecommendationAction} />
+      <AiWorkbenchZone
+        items={workbenchItems}
+        onRecommendationAction={onRecommendationAction}
+        workbenchCleared={(model.recommendations?.length ?? 0) > 0 && workbenchItems.length === 0}
+      />
       <BusinessSnapshotZone kpis={model.kpis} />
       <RecentActivityZone items={model.activities} />
       <SecondaryExplorationZone links={model.quickLinks} />
+
+      <RejectDraftModal
+        open={!!rejectTarget}
+        title={rejectTarget?.title ?? ''}
+        onCancel={() => setRejectTarget(null)}
+        onConfirm={confirmReject}
+      />
+      <ToastAlert toast={toast} />
     </div>
   );
 }

@@ -41,9 +41,9 @@
   --zone-gap: 2.75rem;
   padding: var(--spacing-xl);
   border-radius: var(--radius-2xl);
-  border: 1px solid rgba(96, 165, 255, 0.22);
-  background: linear-gradient(165deg, rgba(96, 165, 255, 0.12) 0%, rgba(15, 23, 42, 0.5) 100%);
-  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96) 0%, rgba(237, 252, 250, 0.8) 45%, rgba(229, 248, 240, 0.72) 100%);
+  box-shadow: var(--shadow-glow);
 }
 
 .db-zone--2 {
@@ -108,8 +108,8 @@
   margin-bottom: var(--spacing-xl);
   padding: var(--spacing-md) var(--spacing-lg);
   border-radius: var(--radius-lg);
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--color-border);
+  background: rgba(215, 251, 245, 0.45);
+  border: 1px solid rgba(14, 165, 164, 0.2);
 }
 
 .db-attention-banner-eyebrow {
@@ -149,7 +149,7 @@
   padding: var(--spacing-md) var(--spacing-lg);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--color-neutral-50);
 }
 
 .db-alert-card--warning {
@@ -158,8 +158,8 @@
 }
 
 .db-alert-card--action {
-  border-color: rgba(96, 165, 255, 0.35);
-  background: rgba(96, 165, 255, 0.08);
+  border-color: rgba(14, 165, 164, 0.35);
+  background: rgba(14, 165, 164, 0.08);
 }
 
 .db-alert-card-title {
@@ -182,16 +182,23 @@
   align-self: center;
   padding: 0.5rem 1rem;
   border-radius: var(--radius-md);
-  background: var(--color-accent);
-  color: #03132b;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: #ffffff;
   font-size: var(--font-size-sm);
-  font-weight: 700;
+  font-weight: var(--font-bold);
   text-decoration: none;
-  transition: background var(--transition-fast);
+  box-shadow: 0 12px 28px rgba(14, 165, 164, 0.22);
+  transition:
+    background var(--transition-normal),
+    border-color var(--transition-normal),
+    transform var(--transition-normal);
 }
 
 .db-alert-card-action:hover {
-  background: var(--color-accent-hover);
+  border-color: var(--color-primary-hover);
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
 }
 
 /* Zone 2 workbench styles live in src/components/workbench/workbench.css */
@@ -219,7 +226,8 @@
   padding: var(--spacing-md) var(--spacing-lg);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
-  background: rgba(255, 255, 255, 0.03);
+  background: linear-gradient(180deg, #ffffff, rgba(237, 252, 250, 0.7));
+  box-shadow: var(--shadow-sm);
 }
 
 .db-kpi-card--placeholder {
@@ -278,7 +286,7 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-surface);
 }
 
 .db-activity-item {
@@ -349,14 +357,15 @@
   padding: var(--spacing-md) var(--spacing-lg);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--color-neutral-50);
   text-decoration: none;
-  transition: border-color var(--transition-fast), background var(--transition-fast);
+  transition: border-color var(--transition-fast), background var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .db-quick-link:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(14, 165, 164, 0.28);
+  background: rgba(215, 251, 245, 0.55);
+  box-shadow: var(--shadow-sm);
 }
 
 .db-quick-link-label {
@@ -404,8 +413,9 @@
   margin-bottom: var(--spacing-xl);
   padding: var(--spacing-lg) var(--spacing-xl);
   border-radius: var(--radius-xl);
-  border: 1px solid rgba(96, 165, 255, 0.35);
-  background: linear-gradient(120deg, rgba(96, 165, 255, 0.14) 0%, rgba(15, 23, 42, 0.65) 100%);
+  border: 1px solid rgba(14, 165, 164, 0.28);
+  background: linear-gradient(120deg, rgba(215, 251, 245, 0.9) 0%, rgba(255, 255, 255, 0.96) 55%, rgba(255, 107, 90, 0.06) 100%);
+  box-shadow: var(--shadow-sm);
 }
 
 .db-handoff-inner {
@@ -431,18 +441,18 @@
   flex-shrink: 0;
   padding: 0.45rem 1rem;
   border-radius: var(--radius-md);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--color-neutral-300);
+  background: rgba(255, 255, 255, 0.92);
   color: var(--color-text-primary);
   font-size: var(--font-size-sm);
-  font-weight: 600;
+  font-weight: var(--font-semibold);
   cursor: pointer;
   transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 
 .db-handoff-dismiss:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.28);
+  border-color: var(--color-secondary);
+  background: var(--color-surface);
 }
 
 /* Error / retry */

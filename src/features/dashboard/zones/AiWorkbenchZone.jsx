@@ -1,6 +1,6 @@
 import RecommendationCard from '../../../components/workbench/RecommendationCard.jsx';
 
-export default function AiWorkbenchZone({ items, onRecommendationAction }) {
+export default function AiWorkbenchZone({ items, onRecommendationAction, workbenchCleared }) {
   return (
     <section className="db-zone db-zone--2" data-zone="workbench" aria-labelledby="db-zone-2-title">
       <div className="db-zone-header db-zone-header--workbench">
@@ -15,6 +15,11 @@ export default function AiWorkbenchZone({ items, onRecommendationAction }) {
           items.map((item) => (
             <RecommendationCard key={item.id} item={item} onAction={(action) => onRecommendationAction?.(item.id, action)} />
           ))
+        ) : workbenchCleared ? (
+          <div className="db-empty">
+            <p>You&apos;re caught up.</p>
+            <p className="db-empty-hint">Nothing waiting here — new drafts will show when Onevo generates them.</p>
+          </div>
         ) : (
           <div className="db-empty">
             <p>No recommendations yet.</p>
