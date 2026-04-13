@@ -95,3 +95,104 @@
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
 }
+
+.ap-pending-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.ap-status {
+  margin: 0 0 var(--spacing-lg);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.ap-error {
+  margin: 0 0 var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.08);
+  color: #fecaca;
+  font-size: var(--font-size-sm);
+}
+
+.ap-inline-link {
+  color: var(--color-accent, #60a5fa);
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.ap-draft-card {
+  padding: var(--spacing-lg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.ap-draft-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-sm);
+}
+
+.ap-draft-card__title {
+  font-size: var(--font-size-base);
+  color: var(--color-text-primary);
+}
+
+.ap-draft-card__ch {
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.ap-draft-card__preview {
+  margin: 0 0 var(--spacing-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.ap-draft-card__meta {
+  margin: 0 0 var(--spacing-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+.ap-draft-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.ap-draft-card__approve {
+  padding: 0.45rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  background: rgba(96, 165, 250, 0.15);
+  color: #fff;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.ap-draft-card__approve:hover:not(:disabled) {
+  background: rgba(96, 165, 250, 0.28);
+}
+
+.ap-draft-card__approve:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}

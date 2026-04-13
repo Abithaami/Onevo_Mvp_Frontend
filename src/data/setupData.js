@@ -30,6 +30,7 @@ export function emptyGrowthData() {
     connectPos: false,
     connectBooking: false,
     fallbackExcelName: '',
+    fallbackCsvName: '',
     fallbackImageName: '',
   };
 }

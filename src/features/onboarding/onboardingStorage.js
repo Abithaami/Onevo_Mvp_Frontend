@@ -107,6 +107,11 @@ export function createInitialState() {
     learningMethod: '',
     websiteUrl: '',
     profileScrapeStatus: 'idle',
+    profilePreviewError: '',
+    /** Serialized `BrandDnaWebExtractionDto` from last successful POST .../preview (survives refresh / server draft). */
+    websiteBrandDnaPreviewJson: '',
+    /** `websiteBrandDnaAgentSummary` from POST .../preview-with-agent when used (short line from API). */
+    websiteBrandDnaAgentSummary: '',
     businessType: '',
     productsOrServices: '',
     location: '',
@@ -120,6 +125,15 @@ export function createInitialState() {
     dataCsvName: '',
     dataPhotoName: '',
     dataManualNotes: '',
+    /** Server IDs for Business Data section (manual submission + data source); persisted in draft. */
+    businessDataManualSourceId: '',
+    businessDataManualSubmissionId: '',
+    /** Uploaded business-context file IDs (persisted; survives refresh). */
+    businessDataFileExcelId: '',
+    businessDataFileCsvId: '',
+    businessDataFilePhotoId: '',
+    businessDataFileUploadError: '',
+    businessDataApiError: '',
     section3Skipped: false,
     socialFacebook: false,
     socialInstagram: false,

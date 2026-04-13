@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { getMockDashboardModel } from '../mockDashboardModel.js';
 
 /**
- * Dashboard screen state — swap mock for API when backend is ready.
+ * Legacy mock dashboard model (workbench KPIs). The main workspace overview uses
+ * `DashboardWorkspaceContent` + real setup data instead — this hook is only for the unused `DashboardView` prototype.
  */
 export function useDashboardScreen() {
   const [loading, setLoading] = useState(true);

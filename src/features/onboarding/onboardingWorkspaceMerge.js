@@ -52,6 +52,7 @@ export function buildWorkspacePayloadFromOnboarding(state) {
       connectPos: Boolean(state.trackPos),
       connectBooking: Boolean(state.trackBooking),
       fallbackExcelName: state.dataExcelName || '',
+      fallbackCsvName: state.dataCsvName || '',
       fallbackImageName: state.dataPhotoName || '',
     },
     connectionData: {

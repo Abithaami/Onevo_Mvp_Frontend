@@ -64,12 +64,12 @@ export default function DashboardView() {
     }
 
     if (action === 'edit') {
-      showToast('Editor will open here when the draft API is connected.', 'info');
+      showToast('Use Content Studio in the dashboard to create and edit LinkedIn drafts.', 'info');
       return;
     }
 
     if (action === 'details') {
-      showToast('Full details — coming with API wiring.', 'info');
+      showToast('Open Content Studio or Approval to work LinkedIn drafts.', 'info');
     }
   }
 

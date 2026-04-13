@@ -11,6 +11,7 @@ import {
   loadWorkspacePayloadFromStorage,
   mergeServerProfilesIntoLocalPayload,
 } from '../lib/workspaceServerApi.js';
+import NotificationsBell from '../features/notifications/NotificationsBell.jsx';
 import { dashboardSidebarSections } from '../pages/dashboard/dashboardNav.js';
 
 const ONBOARDING_PATH = '/app/onboarding';
@@ -119,6 +120,25 @@ export default function WorkspaceLayout() {
     [],
   );
 
+  /** After LinkedIn OAuth, backend redirects here with `?linkedin=connected` (see Authentication:LinkedIn:PostConnectRedirectUrl). */
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const li = params.get('linkedin');
+    const liErr = params.get('linkedin_error');
+    if (li === 'connected') {
+      params.delete('linkedin');
+      const next = params.toString();
+      navigate({ pathname: location.pathname, search: next ? `?${next}` : '' }, { replace: true });
+      void ws.refresh();
+      return;
+    }
+    if (liErr != null && liErr !== '') {
+      params.delete('linkedin_error');
+      const next = params.toString();
+      navigate({ pathname: location.pathname, search: next ? `?${next}` : '' }, { replace: true });
+    }
+  }, [location.search, location.pathname, navigate, ws.refresh]);
+
   const handleSignOut = useCallback(async () => {
     await logout();
     navigate('/auth', { replace: true });
@@ -158,7 +178,7 @@ export default function WorkspaceLayout() {
     return <Navigate to="/app/dashboard" replace />;
   }
   if (!onboardingDone && pathname !== ONBOARDING_PATH) {
-    return <Navigate to={ONBOARDING_PATH} replace />;
+    return <Navigate to={{ pathname: ONBOARDING_PATH, search: location.search }} replace />;
   }
 
   if (isSetupMode) {
@@ -216,17 +236,7 @@ export default function WorkspaceLayout() {
         </div>
 
         <div className="dashboard-topbar__actions">
-          <button type="button" className="dashboard-icon-btn" aria-label="Notifications (coming soon)">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path
-                d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22ZM18 16v-5a6 6 0 0 0-5-5.91V8a1 1 0 1 0-2 0v.09A6 6 0 0 0 6 11v5l-2 2v1h16v-1l-2-2Z"
-                stroke="currentColor"
-                strokeWidth="1.75"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className="dashboard-icon-btn__dot" />
-          </button>
+          <NotificationsBell />
           <span className="dashboard-user-chip" title={contactLine || undefined}>
             <span className="dashboard-user-chip__avatar" aria-hidden="true">
               {avatarLetter}
