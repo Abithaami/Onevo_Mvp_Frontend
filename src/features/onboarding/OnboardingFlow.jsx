@@ -1,12 +1,17 @@
 /**
  * MVP onboarding wizard (4 sections). Local draft + completion flags live in `onboardingStorage.js`.
  *
- * MOCK (replace with API when backend exists):
- * - Website “profile scrape” (`mockExtractedProfile` + delayed `setTimeout`) — simulates extraction from URL.
- * - Social “Connect” buttons — `setTimeout` fake success; no OAuth or Graph API calls.
+ * Website Brand DNA: plain preview (`POST .../preview`) + optional AI agent preview (`POST .../preview-with-agent`); save on finish.
+ * Stale “success” without persisted JSON is reset to re-run preview on section 1; finish blocks if website save has no payload.
+ * Social: non-LinkedIn channels are intent-only in the UI; LinkedIn OAuth uses `/api/integrations/linkedin/*`.
  */
-import { memo, useEffect, useRef, useState } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import {
+  disconnectLinkedIn,
+  fetchLinkedInAuthorizationUrl,
+  fetchLinkedInStatus,
+} from '../integrations/linkedinIntegrationApi.js';
 import { useAuth } from '../../auth/AuthProvider.jsx';
 import { useWorkspaceState } from '../../auth/WorkspaceStateProvider.jsx';
 import OnevoLogo from '../../components/OnevoLogo.jsx';
@@ -23,24 +28,33 @@ import {
   scheduleSaveOnboardingState,
 } from './onboardingStorage.js';
 import { persistWorkspaceFromOnboarding } from './onboardingWorkspaceMerge.js';
+import { previewWebsiteBrandDna, previewWebsiteBrandDnaWithAgent, saveWebsiteBrandDna } from './websiteBrandDnaApi.js';
+import {
+  buildWebsiteBrandDnaSavePayload,
+  extractAgentPreviewMetadata,
+  mapBrandDnaPreviewToOnboardingFields,
+  mergeBrandDnaWithAgentResponseToWebExtractionDto,
+} from './websiteBrandDnaMapping.js';
+import { deleteBusinessContextFile, uploadBusinessContextFile } from './businessContextDataApi.js';
+import { ensureOnboardingManualDataSource, syncOnboardingBusinessData } from './onboardingBusinessDataSync.js';
 import './onboarding.css';
+
+/** @type {Record<'excel' | 'csv' | 'photo', readonly string[]>} */
+const BUSINESS_FILE_EXT = {
+  excel: ['.xlsx', '.xls'],
+  csv: ['.csv'],
+  photo: ['.doc', '.docx'],
+};
+
+function businessFileExtOk(fileName, slot) {
+  const lower = fileName.toLowerCase();
+  return BUSINESS_FILE_EXT[slot].some((e) => lower.endsWith(e));
+}
 
 function toggleGoal(ids, id) {
   if (ids.includes(id)) return ids.filter((g) => g !== id);
   if (ids.length >= MAX_GOALS) return ids;
   return [...ids, id];
-}
-
-/** MOCK: static payload standing in for a future `/api/brand/extract` or similar scrape response. */
-function mockExtractedProfile() {
-  return {
-    businessType: 'Local service business',
-    productsOrServices: 'Consulting, recurring services',
-    location: 'United States',
-    brandTone: 'Friendly and professional',
-    targetCustomers: 'Small business owners',
-    shortDescription: 'We help local businesses grow with practical marketing and clear reporting.',
-  };
 }
 
 /** Memoized so typing in the active section does not re-render the progress bar every keystroke. */
@@ -64,6 +78,7 @@ const SERVER_DRAFT_DEBOUNCE_MS = 1800;
 
 export default function OnboardingFlow() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { logout } = useAuth();
   const {
     saveWorkspaceState,
@@ -77,11 +92,80 @@ export default function OnboardingFlow() {
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [businessDataSyncBusy, setBusinessDataSyncBusy] = useState(false);
+  const [businessDataFileUploading, setBusinessDataFileUploading] = useState(
+    /** @type {null | 'excel' | 'csv' | 'photo'} */ (null),
+  );
+  const [businessDataFileRemoving, setBusinessDataFileRemoving] = useState(
+    /** @type {null | 'excel' | 'csv' | 'photo'} */ (null),
+  );
+  const [businessDataFileDeleteError, setBusinessDataFileDeleteError] = useState('');
+  /** Ephemeral success line (not persisted in draft). */
+  const [businessDataFileNotice, setBusinessDataFileNotice] = useState('');
+
+  const [linkedinStatusLoading, setLinkedinStatusLoading] = useState(false);
+  const [linkedinConnectBusy, setLinkedinConnectBusy] = useState(false);
+  const [linkedinDisconnectBusy, setLinkedinDisconnectBusy] = useState(false);
+  const [linkedinIntegrationError, setLinkedinIntegrationError] = useState('');
+  const [linkedinProfileHint, setLinkedinProfileHint] = useState('');
+  const [agentPreviewBusy, setAgentPreviewBusy] = useState(false);
+  const [agentPreviewError, setAgentPreviewError] = useState('');
+  /** Session-only: large agent JSON for optional disclosure; not persisted in draft. */
+  const [agentStructuredJsonDisplay, setAgentStructuredJsonDisplay] = useState('');
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  const excelFileInputRef = useRef(/** @type {HTMLInputElement | null} */ (null));
+  const csvFileInputRef = useRef(/** @type {HTMLInputElement | null} */ (null));
+  const photoFileInputRef = useRef(/** @type {HTMLInputElement | null} */ (null));
+
+  /** Last successful `POST .../preview` JSON (for save on finish). */
+  const brandDnaPreviewPayloadRef = useRef(/** @type {Record<string, unknown> | null} */ (null));
+  /** Website URL that produced a successful preview (avoid re-scrape when unchanged). */
+  const lastSuccessfulPreviewUrlRef = useRef('');
+
   /** Once true, ignore provider `onboardingDraftJson` updates (e.g. after autosave) so the form is not reset while typing. */
   const didHydrateFromWorkspace = useRef(false);
+
+  /** Restore preview ref + URL marker after hydration or when persisted JSON changes (resume / refresh). */
+  useEffect(() => {
+    if (!hydrated) return;
+    const raw = state.websiteBrandDnaPreviewJson;
+    if (typeof raw === 'string' && raw.length > 0) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          brandDnaPreviewPayloadRef.current = parsed;
+          const src = String(parsed.sourceUrl ?? parsed.SourceUrl ?? '').trim();
+          lastSuccessfulPreviewUrlRef.current = src || state.websiteUrl.trim();
+          return;
+        }
+      } catch {
+        /* invalid persisted JSON — treat as no preview */
+      }
+      brandDnaPreviewPayloadRef.current = null;
+      lastSuccessfulPreviewUrlRef.current = '';
+      return;
+    }
+    brandDnaPreviewPayloadRef.current = null;
+    lastSuccessfulPreviewUrlRef.current = '';
+  }, [hydrated, state.websiteBrandDnaPreviewJson, state.websiteUrl]);
+
+  /**
+   * Resume / older drafts: `profileScrapeStatus` may be `success` while `websiteBrandDnaPreviewJson` is empty (refresh before persist, legacy draft).
+   * Reset to `idle` so the section-1 preview effect can re-fetch when the user is on that step; finish still blocks if no payload (see handleFinishSetup).
+   */
+  useEffect(() => {
+    if (!hydrated) return;
+    if (state.learningMethod !== 'website') return;
+    const url = state.websiteUrl?.trim() ?? '';
+    if (!url) return;
+    const hasPersisted =
+      typeof state.websiteBrandDnaPreviewJson === 'string' && state.websiteBrandDnaPreviewJson.length > 0;
+    if (hasPersisted) return;
+    if (state.profileScrapeStatus !== 'success') return;
+    setState((s) => ({ ...s, profileScrapeStatus: 'idle' }));
+  }, [hydrated, state.learningMethod, state.websiteUrl, state.websiteBrandDnaPreviewJson, state.profileScrapeStatus]);
 
   useEffect(() => {
     if (didHydrateFromWorkspace.current) {
@@ -115,6 +199,21 @@ export default function OnboardingFlow() {
     }
     scheduleSaveOnboardingState(state);
   }, [state, hydrated]);
+
+  useEffect(() => {
+    if (!businessDataFileNotice) {
+      return undefined;
+    }
+    const t = window.setTimeout(() => setBusinessDataFileNotice(''), 5200);
+    return () => window.clearTimeout(t);
+  }, [businessDataFileNotice]);
+
+  useEffect(() => {
+    if (state.sectionIndex !== 2) {
+      setBusinessDataFileNotice('');
+      setBusinessDataFileDeleteError('');
+    }
+  }, [state.sectionIndex]);
 
   useEffect(() => {
     return () => {
@@ -154,6 +253,48 @@ export default function OnboardingFlow() {
 
   const { sectionIndex } = state;
 
+  const refreshLinkedInStatus = useCallback(async () => {
+    setLinkedinStatusLoading(true);
+    setLinkedinIntegrationError('');
+    const r = await fetchLinkedInStatus();
+    setLinkedinStatusLoading(false);
+    if (r.ok) {
+      setState((s) => ({ ...s, socialLinkedin: r.status.isConnected }));
+      const hint = [r.status.linkedInName, r.status.linkedInEmail].filter(Boolean).join(' · ');
+      setLinkedinProfileHint(hint);
+    } else {
+      setLinkedinIntegrationError(r.error);
+      setLinkedinProfileHint('');
+    }
+  }, []);
+
+  /** OAuth return: backend redirects with `?linkedin=connected` or `?linkedin_error=...`. */
+  useEffect(() => {
+    if (!hydrated) return;
+    const params = new URLSearchParams(location.search);
+    const li = params.get('linkedin');
+    const liErr = params.get('linkedin_error');
+    if (li === 'connected') {
+      params.delete('linkedin');
+      const nextSearch = params.toString();
+      navigate({ pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : '' }, { replace: true });
+      void refreshLinkedInStatus();
+      return;
+    }
+    if (liErr != null && liErr !== '') {
+      params.delete('linkedin_error');
+      const nextSearch = params.toString();
+      navigate({ pathname: location.pathname, search: nextSearch ? `?${nextSearch}` : '' }, { replace: true });
+      setLinkedinIntegrationError(decodeURIComponent(liErr.replace(/\+/g, ' ')));
+    }
+  }, [hydrated, location.pathname, location.search, navigate, refreshLinkedInStatus]);
+
+  /** Real LinkedIn connection state when opening Social & goals (section 3). */
+  useEffect(() => {
+    if (!hydrated || sectionIndex !== 3) return;
+    void refreshLinkedInStatus();
+  }, [hydrated, sectionIndex, refreshLinkedInStatus]);
+
   useEffect(() => {
     if (typeof registerExitSetup !== 'function') return undefined;
     const run = () => {
@@ -183,21 +324,66 @@ export default function OnboardingFlow() {
     };
   }, [navigate, registerExitSetup, logout, saveWorkspaceState]);
 
-  /** MOCK: website scrape simulation when entering business profile from website path */
+  /**
+   * Website path: Brand DNA preview on business profile (section 1).
+   * Do not put `profileScrapeStatus` in the dependency array: going idle→loading re-runs the effect,
+   * and cleanup must not call setState (that caused an infinite loop with "Maximum update depth exceeded").
+   * Skip work when we already have a successful preview for the current URL.
+   */
   useEffect(() => {
+    if (!hydrated) return;
     if (sectionIndex !== 1 || state.learningMethod !== 'website') return;
-    if (state.profileScrapeStatus !== 'idle') return;
-    setState((s) => ({ ...s, profileScrapeStatus: 'loading' }));
-    const t = window.setTimeout(() => {
-      const extracted = mockExtractedProfile();
+    const url = state.websiteUrl?.trim() ?? '';
+    if (!url) return;
+
+    const snap = stateRef.current;
+    if (snap.profileScrapeStatus === 'success' && lastSuccessfulPreviewUrlRef.current === url) {
+      return;
+    }
+
+    const ac = new AbortController();
+    setState((s) => ({ ...s, profileScrapeStatus: 'loading', profilePreviewError: '' }));
+
+    void (async () => {
+      const result = await previewWebsiteBrandDna(url, { signal: ac.signal });
+      if (ac.signal.aborted) return;
+      if (!result.ok) {
+        if (result.aborted) return;
+        setAgentStructuredJsonDisplay('');
+        setAgentPreviewError('');
+        setState((s) => ({
+          ...s,
+          profileScrapeStatus: 'error',
+          profilePreviewError: result.error,
+          websiteBrandDnaAgentSummary: '',
+        }));
+        return;
+      }
+      brandDnaPreviewPayloadRef.current = result.data;
+      lastSuccessfulPreviewUrlRef.current = url;
+      let previewJson = '';
+      try {
+        previewJson = JSON.stringify(result.data);
+      } catch {
+        previewJson = '';
+      }
+      const mapped = mapBrandDnaPreviewToOnboardingFields(result.data);
+      setAgentStructuredJsonDisplay('');
+      setAgentPreviewError('');
       setState((s) => ({
         ...s,
         profileScrapeStatus: 'success',
-        ...extracted,
+        profilePreviewError: '',
+        websiteBrandDnaPreviewJson: previewJson,
+        websiteBrandDnaAgentSummary: '',
+        ...mapped,
       }));
-    }, 1600);
-    return () => window.clearTimeout(t);
-  }, [sectionIndex, state.learningMethod, state.profileScrapeStatus]);
+    })();
+
+    return () => {
+      ac.abort();
+    };
+  }, [hydrated, sectionIndex, state.learningMethod, state.websiteUrl]);
 
   function validateSection0() {
     if (!state.fullName.trim()) return 'Please enter your full name.';
@@ -208,6 +394,9 @@ export default function OnboardingFlow() {
   }
 
   function validateSection1() {
+    if (state.learningMethod === 'website' && agentPreviewBusy) {
+      return 'Please wait for the AI preview to finish.';
+    }
     if (state.learningMethod === 'website' && state.profileScrapeStatus === 'loading') {
       return 'Please wait for the website preview to finish.';
     }
@@ -244,13 +433,52 @@ export default function OnboardingFlow() {
     setError('');
   }
 
-  function handleContinue() {
+  async function handleContinue() {
     let err = '';
     if (sectionIndex === 0) err = validateSection0();
     else if (sectionIndex === 1) err = validateSection1();
     else if (sectionIndex === 2) err = '';
     if (err) {
       setError(err);
+      return;
+    }
+    if (sectionIndex === 0) {
+      const cur = stateRef.current;
+      const next = { ...cur, sectionIndex: 1 };
+      if (cur.learningMethod === 'website') {
+        const u = cur.websiteUrl.trim();
+        if (u !== lastSuccessfulPreviewUrlRef.current) {
+          next.profileScrapeStatus = 'idle';
+          next.profilePreviewError = '';
+          next.websiteBrandDnaPreviewJson = '';
+          next.websiteBrandDnaAgentSummary = '';
+          brandDnaPreviewPayloadRef.current = null;
+        }
+      }
+      flushSaveOnboardingState(next);
+      setState(next);
+      setError('');
+      return;
+    }
+    if (sectionIndex === 2) {
+      setBusinessDataSyncBusy(true);
+      try {
+        const cur = stateRef.current;
+        const r = await syncOnboardingBusinessData(cur);
+        const nextPatch = { ...(r.statePatch || {}) };
+        nextPatch.businessDataApiError = r.ok ? '' : r.error || 'Could not sync business data to the server.';
+        if (r.ok) {
+          nextPatch.businessDataFileUploadError = '';
+          setBusinessDataFileDeleteError('');
+          setBusinessDataFileNotice('');
+        }
+        const next = { ...cur, ...nextPatch, sectionIndex: 3 };
+        flushSaveOnboardingState(next);
+        setState(next);
+        setError('');
+      } finally {
+        setBusinessDataSyncBusy(false);
+      }
       return;
     }
     if (sectionIndex < 3) goNext();
@@ -267,6 +495,25 @@ export default function OnboardingFlow() {
     setError('');
   }
 
+  /** Preview DTO for save: in-memory ref (current session) or persisted draft string (after refresh). */
+  function resolveWebsiteBrandDnaPreviewForSave() {
+    if (brandDnaPreviewPayloadRef.current) {
+      return brandDnaPreviewPayloadRef.current;
+    }
+    const raw = state.websiteBrandDnaPreviewJson;
+    if (typeof raw === 'string' && raw.length > 0) {
+      try {
+        const p = JSON.parse(raw);
+        if (p && typeof p === 'object') {
+          return p;
+        }
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }
+
   async function handleFinishSetup() {
     const err = validateSection3();
     if (err) {
@@ -278,7 +525,32 @@ export default function OnboardingFlow() {
     try {
       flushSaveOnboardingState(state);
       persistWorkspaceFromOnboarding(state);
-      await upsertBusinessProfileFromOnboardingState(state);
+      const profileSaved = await upsertBusinessProfileFromOnboardingState(state);
+      if (!profileSaved) {
+        setError('Could not save your business profile to the server. Please retry.');
+        return;
+      }
+      if (state.learningMethod === 'website') {
+        const previewRecord = resolveWebsiteBrandDnaPreviewForSave();
+        if (!previewRecord) {
+          setError(
+            'Your website Brand DNA preview is missing. Go back to the Business profile step and wait for the preview to finish, or use “Clear preview and enter manually”.',
+          );
+          return;
+        }
+        const dnaPayload = buildWebsiteBrandDnaSavePayload(previewRecord, state);
+        const dnaSave = await saveWebsiteBrandDna(dnaPayload);
+        if (!dnaSave.ok) {
+          setError(dnaSave.error || 'Could not save website Brand DNA. Try again.');
+          return;
+        }
+      }
+      const bd = await syncOnboardingBusinessData(stateRef.current);
+      if (bd.statePatch && Object.keys(bd.statePatch).length > 0) {
+        Object.assign(stateRef.current, bd.statePatch);
+      }
+      setState((s) => ({ ...s, ...(bd.statePatch || {}) }));
+      flushSaveOnboardingState(stateRef.current);
       const raw = loadWorkspacePayloadFromStorage();
       const ok = await saveWorkspaceState({
         onboardingComplete: true,
@@ -297,13 +569,210 @@ export default function OnboardingFlow() {
     }
   }
 
+  async function handleLinkedInConnect() {
+    setLinkedinConnectBusy(true);
+    setLinkedinIntegrationError('');
+    const r = await fetchLinkedInAuthorizationUrl();
+    setLinkedinConnectBusy(false);
+    if (!r.ok) {
+      setLinkedinIntegrationError(r.error);
+      return;
+    }
+    window.location.assign(r.authorizationUrl);
+  }
+
+  async function handleLinkedInDisconnect() {
+    setLinkedinDisconnectBusy(true);
+    setLinkedinIntegrationError('');
+    const r = await disconnectLinkedIn();
+    setLinkedinDisconnectBusy(false);
+    if (!r.ok) {
+      setLinkedinIntegrationError(r.error);
+      return;
+    }
+    setState((s) => ({ ...s, socialLinkedin: false }));
+    setLinkedinProfileHint('');
+  }
+
   function handleFallbackManual() {
+    brandDnaPreviewPayloadRef.current = null;
+    lastSuccessfulPreviewUrlRef.current = '';
+    setAgentStructuredJsonDisplay('');
+    setAgentPreviewError('');
     setState((s) => ({
       ...s,
       profileScrapeStatus: 'error',
       learningMethod: 'manual',
+      profilePreviewError: '',
+      websiteBrandDnaPreviewJson: '',
+      websiteBrandDnaAgentSummary: '',
     }));
   }
+
+  async function handlePreviewWithAgent() {
+    const url = stateRef.current.websiteUrl?.trim() ?? '';
+    if (!url) return;
+    setAgentPreviewError('');
+    setAgentPreviewBusy(true);
+    const result = await previewWebsiteBrandDnaWithAgent(url);
+    setAgentPreviewBusy(false);
+    if (!result.ok) {
+      if (result.aborted) return;
+      setAgentPreviewError(result.error || 'AI-assisted preview failed.');
+      return;
+    }
+    const merged = mergeBrandDnaWithAgentResponseToWebExtractionDto(
+      /** @type {Record<string, unknown>} */ (result.data),
+    );
+    if (!merged) {
+      setAgentPreviewError('Unexpected response from the server.');
+      return;
+    }
+    const meta = extractAgentPreviewMetadata(/** @type {Record<string, unknown>} */ (result.data));
+    brandDnaPreviewPayloadRef.current = merged;
+    lastSuccessfulPreviewUrlRef.current = url;
+    let previewJson = '';
+    try {
+      previewJson = JSON.stringify(merged);
+    } catch {
+      previewJson = '';
+    }
+    const mapped = mapBrandDnaPreviewToOnboardingFields(merged);
+    setAgentStructuredJsonDisplay(meta.websiteBrandDnaAgentStructuredJson || '');
+    setState((s) => ({
+      ...s,
+      profileScrapeStatus: 'success',
+      profilePreviewError: '',
+      websiteBrandDnaPreviewJson: previewJson,
+      websiteBrandDnaAgentSummary: meta.websiteBrandDnaAgentSummary,
+      ...mapped,
+    }));
+  }
+
+  const handleBusinessFileUpload = useCallback(async (slot, event) => {
+    const input = event.target;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+
+    setBusinessDataFileDeleteError('');
+    setBusinessDataFileNotice('');
+
+    if (!businessFileExtOk(file.name, slot)) {
+      setState((s) => ({
+        ...s,
+        businessDataFileUploadError: `Could not upload: use ${BUSINESS_FILE_EXT[slot].join(' or ')}.`,
+      }));
+      return;
+    }
+
+    setState((s) => ({ ...s, businessDataFileUploadError: '' }));
+    setBusinessDataFileUploading(slot);
+
+    const cur = stateRef.current;
+    const ens = await ensureOnboardingManualDataSource(cur.businessDataManualSourceId);
+    if (!ens.ok) {
+      setBusinessDataFileUploading(null);
+      setState((s) => ({
+        ...s,
+        businessDataFileUploadError: `Could not upload: ${ens.error}`,
+      }));
+      return;
+    }
+
+    const dsId = ens.manualDsId;
+    setState((s) => ({
+      ...s,
+      businessDataManualSourceId: dsId,
+    }));
+
+    const up = await uploadBusinessContextFile(file, dsId);
+    setBusinessDataFileUploading(null);
+
+    if (!up.ok) {
+      setState((s) => ({
+        ...s,
+        businessDataFileUploadError: `Could not upload: ${up.error}`,
+      }));
+      return;
+    }
+
+    const displayName = up.file.originalFileName || file.name;
+    setState((s) => {
+      const next = {
+        ...s,
+        businessDataManualSourceId: dsId,
+        businessDataFileUploadError: '',
+      };
+      if (slot === 'excel') {
+        next.businessDataFileExcelId = up.file.id;
+        next.dataExcelName = displayName;
+      } else if (slot === 'csv') {
+        next.businessDataFileCsvId = up.file.id;
+        next.dataCsvName = displayName;
+      } else {
+        next.businessDataFilePhotoId = up.file.id;
+        next.dataPhotoName = displayName;
+      }
+      return next;
+    });
+    setBusinessDataFileNotice('File uploaded. It will be included when you continue or finish setup.');
+  }, []);
+
+  const handleRemoveBusinessFileSlot = useCallback(async (slot) => {
+    setBusinessDataFileUploadError('');
+    setBusinessDataFileDeleteError('');
+    setBusinessDataFileNotice('');
+    const cur = stateRef.current;
+    const id =
+      slot === 'excel'
+        ? cur.businessDataFileExcelId
+        : slot === 'csv'
+          ? cur.businessDataFileCsvId
+          : cur.businessDataFilePhotoId;
+    const trimmed = String(id ?? '').trim();
+    if (!trimmed) {
+      setState((s) => {
+        const next = { ...s, businessDataFileUploadError: '' };
+        if (slot === 'excel') {
+          next.dataExcelName = '';
+        } else if (slot === 'csv') {
+          next.dataCsvName = '';
+        } else {
+          next.dataPhotoName = '';
+        }
+        return next;
+      });
+      return;
+    }
+
+    setBusinessDataFileRemoving(slot);
+    const del = await deleteBusinessContextFile(trimmed);
+    setBusinessDataFileRemoving(null);
+
+    if (!del.ok) {
+      setBusinessDataFileDeleteError(
+        del.error ? `Could not remove file: ${del.error}` : 'Could not remove file. Try again.',
+      );
+      return;
+    }
+
+    setState((s) => {
+      const next = { ...s, businessDataFileUploadError: '' };
+      if (slot === 'excel') {
+        next.businessDataFileExcelId = '';
+        next.dataExcelName = '';
+      } else if (slot === 'csv') {
+        next.businessDataFileCsvId = '';
+        next.dataCsvName = '';
+      } else {
+        next.businessDataFilePhotoId = '';
+        next.dataPhotoName = '';
+      }
+      return next;
+    });
+    setBusinessDataFileNotice('File removed from your account.');
+  }, []);
 
   if (!hydrated) {
     return <div className="onboarding onboarding--loading" aria-busy="true" />;
@@ -316,6 +785,9 @@ export default function OnboardingFlow() {
     (state.learningMethod === 'manual' ||
       state.profileScrapeStatus === 'success' ||
       state.profileScrapeStatus === 'error');
+
+  const businessDataFileRowBusy =
+    businessDataFileUploading !== null || businessDataFileRemoving !== null || businessDataSyncBusy;
 
   return (
     <div className="onboarding onboarding--mvp">
@@ -408,7 +880,7 @@ export default function OnboardingFlow() {
           ) : null}
 
           <div className="onboarding-mvp-actions">
-            <button type="button" className="onboarding-btn onboarding-btn--primary" onClick={handleContinue}>
+            <button type="button" className="onboarding-btn onboarding-btn--primary" onClick={() => void handleContinue()}>
               Continue
             </button>
           </div>
@@ -431,8 +903,50 @@ export default function OnboardingFlow() {
           ) : null}
 
           {state.learningMethod === 'website' && state.profileScrapeStatus === 'error' ? (
-            <div className="onboarding-mvp-banner" role="status">
-              <p>We couldn&apos;t read that website automatically. Enter your business details manually below.</p>
+            <div className="onboarding-mvp-banner" role="alert">
+              <p>We couldn&apos;t read that website automatically.</p>
+              {state.profilePreviewError ? (
+                <p className="onboarding-mvp-hint">{state.profilePreviewError}</p>
+              ) : null}
+              <p>Enter your business details manually below.</p>
+            </div>
+          ) : null}
+
+          {state.learningMethod === 'website' &&
+          !showProfileLoading &&
+          (state.profileScrapeStatus === 'success' || state.profileScrapeStatus === 'error') &&
+          state.websiteUrl.trim() ? (
+            <div className="onboarding-mvp-agent-tools">
+              <p className="onboarding-mvp-hint">
+                {state.profileScrapeStatus === 'success'
+                  ? 'Optional: run the Website Brand DNA agent on the same URL to merge AI-refined fields into your preview (uses POST /preview-with-agent).'
+                  : 'Optional: try an AI-assisted preview that scrapes the URL and runs the Website Brand DNA agent — it may work when the basic preview failed.'}
+              </p>
+              <button
+                type="button"
+                className="onboarding-btn onboarding-btn--ghost"
+                disabled={agentPreviewBusy}
+                onClick={() => void handlePreviewWithAgent()}
+              >
+                {agentPreviewBusy ? 'Running AI preview…' : 'Preview with AI agent'}
+              </button>
+              {agentPreviewError ? (
+                <p className="onboarding-error" role="alert">
+                  {agentPreviewError}
+                </p>
+              ) : null}
+              {state.websiteBrandDnaAgentSummary ? (
+                <>
+                  <p className="onboarding-mvp-sublabel onboarding-mvp-agent-summary-label">Agent summary (from API)</p>
+                  <p className="onboarding-mvp-hint">{state.websiteBrandDnaAgentSummary}</p>
+                </>
+              ) : null}
+              {agentStructuredJsonDisplay ? (
+                <details className="onboarding-mvp-agent-details">
+                  <summary>Agent structured JSON (from API)</summary>
+                  <pre className="onboarding-mvp-pre-scroll">{agentStructuredJsonDisplay}</pre>
+                </details>
+              ) : null}
             </div>
           ) : null}
 
@@ -516,8 +1030,8 @@ export default function OnboardingFlow() {
             <button
               type="button"
               className="onboarding-btn onboarding-btn--primary"
-              onClick={handleContinue}
-              disabled={showProfileLoading}
+              onClick={() => void handleContinue()}
+              disabled={showProfileLoading || agentPreviewBusy}
             >
               Continue
             </button>
@@ -531,6 +1045,12 @@ export default function OnboardingFlow() {
             Business data
           </h1>
           <p className="onboarding-mvp-lede">How do you currently track your business?</p>
+
+          {state.businessDataApiError ? (
+            <p className="onboarding-error" role="status">
+              {state.businessDataApiError}
+            </p>
+          ) : null}
 
           <p className="onboarding-mvp-sublabel">Connected systems (optional)</p>
           <div className="onboarding-mvp-toggles">
@@ -561,35 +1081,151 @@ export default function OnboardingFlow() {
           </div>
 
           <p className="onboarding-mvp-sublabel">Manual data (optional)</p>
-          <p className="onboarding-mvp-hint">Uploads are stored as filenames for now — file upload can be wired later.</p>
+          <p className="onboarding-mvp-hint">
+            You can skip this whole section. If you add files or notes, they are saved when you continue or finish
+            setup. If an upload or remove fails, you will see a message below—you can still continue without files.
+          </p>
+          {state.businessDataFileUploadError ? (
+            <p className="onboarding-error" role="status">
+              {state.businessDataFileUploadError}
+            </p>
+          ) : null}
+          {businessDataFileDeleteError ? (
+            <p className="onboarding-error" role="status">
+              {businessDataFileDeleteError}
+            </p>
+          ) : null}
+          {businessDataFileNotice ? (
+            <p className="onboarding-mvp-notice" role="status">
+              {businessDataFileNotice}
+            </p>
+          ) : null}
+
           <label className="onboarding-mvp-label" htmlFor="excel">
-            Excel file name
+            Excel spreadsheet
           </label>
-          <input
-            id="excel"
-            className="onboarding-mvp-input"
-            value={state.dataExcelName}
-            placeholder="e.g. sales_q1.xlsx"
-            onChange={(e) => setState((s) => ({ ...s, dataExcelName: e.target.value }))}
-          />
+          <div className="onboarding-mvp-file-row">
+            <input
+              id="excel"
+              className="onboarding-mvp-input"
+              readOnly={Boolean(state.businessDataFileExcelId)}
+              value={state.dataExcelName}
+              placeholder="e.g. sales_q1.xlsx or upload"
+              onChange={(e) => setState((s) => ({ ...s, dataExcelName: e.target.value }))}
+            />
+            <input
+              ref={excelFileInputRef}
+              type="file"
+              className="visually-hidden"
+              accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              aria-hidden
+              tabIndex={-1}
+              onChange={(e) => void handleBusinessFileUpload('excel', e)}
+            />
+            <button
+              type="button"
+              className="onboarding-btn onboarding-btn--ghost"
+              disabled={businessDataFileRowBusy}
+              onClick={() => excelFileInputRef.current?.click()}
+            >
+              {businessDataFileUploading === 'excel' ? 'Uploading…' : 'Upload'}
+            </button>
+            {state.businessDataFileExcelId ? (
+              <button
+                type="button"
+                className="onboarding-btn onboarding-btn--ghost"
+                disabled={businessDataFileRowBusy}
+                onClick={() => void handleRemoveBusinessFileSlot('excel')}
+              >
+                {businessDataFileRemoving === 'excel' ? 'Removing…' : 'Remove'}
+              </button>
+            ) : null}
+          </div>
+
           <label className="onboarding-mvp-label" htmlFor="csv">
-            CSV file name
+            CSV file
           </label>
-          <input
-            id="csv"
-            className="onboarding-mvp-input"
-            value={state.dataCsvName}
-            onChange={(e) => setState((s) => ({ ...s, dataCsvName: e.target.value }))}
-          />
-          <label className="onboarding-mvp-label" htmlFor="photo">
-            Photo / screenshot name
+          <div className="onboarding-mvp-file-row">
+            <input
+              id="csv"
+              className="onboarding-mvp-input"
+              readOnly={Boolean(state.businessDataFileCsvId)}
+              value={state.dataCsvName}
+              placeholder="e.g. export.csv or upload"
+              onChange={(e) => setState((s) => ({ ...s, dataCsvName: e.target.value }))}
+            />
+            <input
+              ref={csvFileInputRef}
+              type="file"
+              className="visually-hidden"
+              accept=".csv,text/csv"
+              aria-hidden
+              tabIndex={-1}
+              onChange={(e) => void handleBusinessFileUpload('csv', e)}
+            />
+            <button
+              type="button"
+              className="onboarding-btn onboarding-btn--ghost"
+              disabled={businessDataFileRowBusy}
+              onClick={() => csvFileInputRef.current?.click()}
+            >
+              {businessDataFileUploading === 'csv' ? 'Uploading…' : 'Upload'}
+            </button>
+            {state.businessDataFileCsvId ? (
+              <button
+                type="button"
+                className="onboarding-btn onboarding-btn--ghost"
+                disabled={businessDataFileRowBusy}
+                onClick={() => void handleRemoveBusinessFileSlot('csv')}
+              >
+                {businessDataFileRemoving === 'csv' ? 'Removing…' : 'Remove'}
+              </button>
+            ) : null}
+          </div>
+
+          <label className="onboarding-mvp-label" htmlFor="wordDoc">
+            Word document
           </label>
-          <input
-            id="photo"
-            className="onboarding-mvp-input"
-            value={state.dataPhotoName}
-            onChange={(e) => setState((s) => ({ ...s, dataPhotoName: e.target.value }))}
-          />
+          <p className="onboarding-mvp-hint onboarding-mvp-hint--tight">
+            Only Microsoft Word .doc or .docx files. Photos, screenshots, and other images are not supported yet.
+          </p>
+          <div className="onboarding-mvp-file-row">
+            <input
+              id="wordDoc"
+              className="onboarding-mvp-input"
+              readOnly={Boolean(state.businessDataFilePhotoId)}
+              value={state.dataPhotoName}
+              placeholder="e.g. summary.docx or upload"
+              onChange={(e) => setState((s) => ({ ...s, dataPhotoName: e.target.value }))}
+            />
+            <input
+              ref={photoFileInputRef}
+              type="file"
+              className="visually-hidden"
+              accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              aria-hidden
+              tabIndex={-1}
+              onChange={(e) => void handleBusinessFileUpload('photo', e)}
+            />
+            <button
+              type="button"
+              className="onboarding-btn onboarding-btn--ghost"
+              disabled={businessDataFileRowBusy}
+              onClick={() => photoFileInputRef.current?.click()}
+            >
+              {businessDataFileUploading === 'photo' ? 'Uploading…' : 'Upload'}
+            </button>
+            {state.businessDataFilePhotoId ? (
+              <button
+                type="button"
+                className="onboarding-btn onboarding-btn--ghost"
+                disabled={businessDataFileRowBusy}
+                onClick={() => void handleRemoveBusinessFileSlot('photo')}
+              >
+                {businessDataFileRemoving === 'photo' ? 'Removing…' : 'Remove'}
+              </button>
+            ) : null}
+          </div>
 
           <label className="onboarding-mvp-label" htmlFor="notes">
             Anything else about how you track performance?
@@ -603,14 +1239,29 @@ export default function OnboardingFlow() {
           />
 
           <div className="onboarding-mvp-actions">
-            <button type="button" className="onboarding-btn onboarding-btn--ghost" onClick={goBack}>
+            <button
+              type="button"
+              className="onboarding-btn onboarding-btn--ghost"
+              onClick={goBack}
+              disabled={businessDataFileRowBusy}
+            >
               Back
             </button>
-            <button type="button" className="onboarding-btn onboarding-btn--ghost" onClick={handleSkipSection3}>
+            <button
+              type="button"
+              className="onboarding-btn onboarding-btn--ghost"
+              onClick={handleSkipSection3}
+              disabled={businessDataFileRowBusy}
+            >
               Skip for now
             </button>
-            <button type="button" className="onboarding-btn onboarding-btn--primary" onClick={handleContinue}>
-              Continue
+            <button
+              type="button"
+              className="onboarding-btn onboarding-btn--primary"
+              onClick={() => void handleContinue()}
+              disabled={businessDataFileRowBusy}
+            >
+              {businessDataSyncBusy ? 'Saving…' : 'Continue'}
             </button>
           </div>
         </section>
@@ -626,11 +1277,15 @@ export default function OnboardingFlow() {
           <div className="onboarding-mvp-s4-block">
             <h2 className="onboarding-mvp-s4-heading">Social channels (optional)</h2>
             <p className="onboarding-mvp-s4-hint">Connect now or skip — you can add these later in Integrations.</p>
+            {linkedinIntegrationError ? (
+              <p className="onboarding-error" role="status">
+                {linkedinIntegrationError}
+              </p>
+            ) : null}
             <div className="onboarding-mvp-social">
               {[
                 { id: 'facebook', label: 'Facebook Page', key: 'socialFacebook' },
                 { id: 'instagram', label: 'Instagram', key: 'socialInstagram' },
-                { id: 'linkedin', label: 'LinkedIn', key: 'socialLinkedin' },
               ].map((ch) => {
                 const connected = state[ch.key];
                 const connecting = state.socialConnectingId === ch.id;
@@ -640,10 +1295,16 @@ export default function OnboardingFlow() {
                     <button
                       type="button"
                       className="onboarding-btn onboarding-btn--secondary"
-                      disabled={connected || (Boolean(state.socialConnectingId) && !connecting)}
+                      disabled={
+                        connected ||
+                        (Boolean(state.socialConnectingId) && !connecting) ||
+                        linkedinStatusLoading ||
+                        linkedinConnectBusy ||
+                        linkedinDisconnectBusy
+                      }
                       onClick={() => {
                         setState((s) => ({ ...s, socialConnectingId: ch.id }));
-                        /* MOCK: instant fake success — replace with OAuth popup / backend callback. */
+                        /* MOCK: demo only — not real OAuth. */
                         window.setTimeout(() => {
                           setState((s) => ({
                             ...s,
@@ -658,6 +1319,43 @@ export default function OnboardingFlow() {
                   </div>
                 );
               })}
+              <div className="onboarding-mvp-social-row">
+                <span title={linkedinProfileHint || undefined}>LinkedIn</span>
+                {state.socialLinkedin ? (
+                  <>
+                    <span className="onboarding-mvp-hint">
+                      Connected{linkedinProfileHint ? ` · ${linkedinProfileHint}` : ''}
+                    </span>
+                    <button
+                      type="button"
+                      className="onboarding-btn onboarding-btn--secondary"
+                      disabled={
+                        linkedinStatusLoading ||
+                        linkedinConnectBusy ||
+                        linkedinDisconnectBusy ||
+                        Boolean(state.socialConnectingId)
+                      }
+                      onClick={() => void handleLinkedInDisconnect()}
+                    >
+                      {linkedinDisconnectBusy ? 'Disconnecting…' : 'Disconnect'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="onboarding-btn onboarding-btn--secondary"
+                    disabled={
+                      linkedinStatusLoading ||
+                      linkedinConnectBusy ||
+                      linkedinDisconnectBusy ||
+                      Boolean(state.socialConnectingId)
+                    }
+                    onClick={() => void handleLinkedInConnect()}
+                  >
+                    {linkedinStatusLoading ? 'Checking…' : linkedinConnectBusy ? 'Redirecting…' : 'Connect'}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 

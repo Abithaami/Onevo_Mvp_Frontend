@@ -1,0 +1,217 @@
+/* Orchestrator MVP section — scoped helpers; shares content-studio tokens */
+
+.orch-block__summary {
+  margin: 0 0 var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--color-text-primary);
+}
+
+.orch-dl {
+  margin: 0;
+  display: grid;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}
+
+.orch-dl--compact {
+  margin-bottom: var(--spacing-md);
+}
+
+.orch-dl div {
+  display: grid;
+  grid-template-columns: minmax(7rem, 10rem) 1fr;
+  gap: var(--spacing-sm);
+}
+
+.orch-dl dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.orch-dl dd {
+  margin: 0;
+  color: var(--color-text-primary);
+}
+
+.orch-mono {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  word-break: break-all;
+}
+
+.orch-muted {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+
+.orch-list-plain {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.orch-subheading {
+  margin: var(--spacing-md) 0 var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.orch-handoff-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.orch-handoff {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.orch-handoff__summary {
+  margin: var(--spacing-xs) 0 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+
+.orch-tag {
+  margin-left: var(--spacing-sm);
+  padding: 0.1rem 0.45rem;
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  background: rgba(96, 165, 255, 0.12);
+  color: #93c5fd;
+}
+
+.orch-details {
+  margin-top: var(--spacing-sm);
+  font-size: var(--font-size-xs);
+}
+
+.orch-details summary {
+  cursor: pointer;
+  color: var(--color-accent);
+}
+
+.orch-run-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.orch-run-input {
+  flex: 1 1 16rem;
+  min-width: min(100%, 16rem);
+}
+
+.orch-run-detail {
+  margin-top: var(--spacing-md);
+}
+
+.orch-pre-wrap {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.orch-step-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.orch-step {
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.orch-step__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.orch-step__time {
+  margin: var(--spacing-sm) 0 0;
+  font-size: var(--font-size-xs);
+}
+
+.orch-image-grid {
+  margin: var(--spacing-md) 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.orch-image-card {
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.orch-image-card__thumb {
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.25);
+  display: grid;
+  place-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.orch-image-card__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.orch-image-meta {
+  margin: 0 0 var(--spacing-sm);
+  flex: 1;
+  display: grid;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+}
+
+.orch-image-meta div {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: var(--spacing-xs);
+}
+
+.orch-image-meta dt {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.orch-image-meta dd {
+  margin: 0;
+  word-break: break-word;
+}
+
+.orch-image-del {
+  align-self: flex-start;
+  font-size: var(--font-size-xs);
+}

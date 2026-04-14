@@ -9,6 +9,10 @@ export default defineConfig(({ mode }) => {
     plugins: [react()],
     server: {
       host: '127.0.0.1',
+      // LinkedIn callback redirect URLs are configured for 127.0.0.1:5173.
+      // Keep dev origin stable so OAuth round-trips don't land on the wrong port.
+      port: 5173,
+      strictPort: true,
       proxy: {
         '/api': {
           target: proxyTarget,

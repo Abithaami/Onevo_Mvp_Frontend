@@ -994,6 +994,30 @@
   opacity: 0.85;
 }
 
+.onboarding-mvp-hint--tight {
+  margin-top: -0.25rem;
+  margin-bottom: var(--spacing-sm);
+}
+
+.onboarding-mvp-notice {
+  margin: 0 0 var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.onboarding-mvp-file-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+}
+
+.onboarding-mvp-file-row .onboarding-mvp-input {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
 .onboarding-mvp-banner {
   margin-bottom: var(--spacing-lg);
   padding: var(--spacing-md);
@@ -1048,6 +1072,43 @@
 
 .onboarding-mvp-retry {
   margin-top: var(--spacing-md);
+}
+
+.onboarding-mvp-agent-tools {
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.onboarding-mvp-agent-summary-label {
+  margin-top: var(--spacing-md);
+}
+
+.onboarding-mvp-agent-details {
+  margin-top: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.onboarding-mvp-agent-details summary {
+  cursor: pointer;
+  color: var(--color-accent);
+}
+
+.onboarding-mvp-pre-scroll {
+  margin: var(--spacing-sm) 0 0;
+  padding: var(--spacing-sm);
+  max-height: 12rem;
+  overflow: auto;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: rgba(0, 0, 0, 0.2);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* Section 4 — grouped blocks, extra breathing room */

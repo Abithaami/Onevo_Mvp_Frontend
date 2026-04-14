@@ -20,7 +20,7 @@ const STATUS_LABEL = {
 };
 
 export default function ConnectionCard({ integration, onConnect, onReconnect, onDisconnect }) {
-  const { id, label, description, status, lastSyncedAt, detail } = integration;
+  const { id, label, description, status, lastSyncedAt, detail, connectDisabled } = integration;
   const syncedLabel = formatSynced(lastSyncedAt);
 
   return (
@@ -46,9 +46,13 @@ export default function ConnectionCard({ integration, onConnect, onReconnect, on
 
       <div className="int-card-actions">
         {status === 'not_connected' ? (
-          <button type="button" className="int-btn int-btn--primary" onClick={() => onConnect?.(id)}>
-            Connect {label}
-          </button>
+          connectDisabled ? (
+            <p className="int-card-placeholder-msg">Connect is not available in this MVP release.</p>
+          ) : (
+            <button type="button" className="int-btn int-btn--primary" onClick={() => onConnect?.(id)}>
+              Connect {label}
+            </button>
+          )
         ) : null}
         {status === 'expired' || status === 'error' ? (
           <>

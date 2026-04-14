@@ -1,21 +1,50 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import ToastAlert from '../../components/auth/ToastAlert.jsx';
-import RejectDraftModal from '../../components/workbench/RejectDraftModal.jsx';
-import RecommendationCard from '../../components/workbench/RecommendationCard.jsx';
-import { getMockApprovalQueue } from './mockApprovalQueue.js';
+import {
+  approveContentDraft,
+  fetchPendingApprovalDrafts,
+  mapPendingApprovalDraftRow,
+} from '../content/contentDraftsApi.js';
+import { formatContentStatusLabel } from '../content/contentStatusLabels.js';
 import './approval.css';
 
-const FILTERS = [
-  { id: 'all', label: 'All' },
-  { id: 'urgent', label: 'Urgent' },
-  { id: 'normal', label: 'Standard' }
-];
+function formatWhen(iso) {
+  if (iso == null) return '—';
+  try {
+    const d = new Date(/** @type {string} */ (iso));
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  } catch {
+    return '—';
+  }
+}
 
 export default function ApprovalQueueView() {
-  const [queueItems, setQueueItems] = useState(() => getMockApprovalQueue());
-  const [filter, setFilter] = useState('all');
+  const [rawItems, setRawItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState('');
+  const [approvingId, setApprovingId] = useState(null);
+  const [approveError, setApproveError] = useState('');
   const [toast, setToast] = useState(null);
-  const [rejectTarget, setRejectTarget] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setFetchError('');
+    setApproveError('');
+    const r = await fetchPendingApprovalDrafts();
+    setLoading(false);
+    if (!r.ok) {
+      setFetchError(r.error);
+      setRawItems([]);
+      return;
+    }
+    setRawItems(r.items);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   useEffect(() => {
     if (!toast) {
@@ -25,62 +54,26 @@ export default function ApprovalQueueView() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
+  const items = useMemo(
+    () => rawItems.map(mapPendingApprovalDraftRow).filter((row) => row && row.id),
+    [rawItems],
+  );
+
   function showToast(message, type = 'info') {
     setToast({ message, type });
   }
 
-  const items = useMemo(() => {
-    if (filter === 'urgent') {
-      return queueItems.filter((i) => i.urgency === 'high');
-    }
-    if (filter === 'normal') {
-      return queueItems.filter((i) => i.urgency === 'normal');
-    }
-    return queueItems;
-  }, [queueItems, filter]);
-
-  function removeItem(id) {
-    setQueueItems((prev) => prev.filter((i) => i.id !== id));
-  }
-
-  function handleAction(id, action) {
-    const item = queueItems.find((i) => i.id === id);
-    const title = item?.title ?? 'This item';
-
-    if (action === 'reject') {
-      setRejectTarget({ id, title });
+  async function handleApprove(id) {
+    setApprovingId(id);
+    setApproveError('');
+    const r = await approveContentDraft(id);
+    setApprovingId(null);
+    if (!r.ok) {
+      setApproveError(r.error);
       return;
     }
-
-    if (action === 'approve') {
-      removeItem(id);
-      showToast(`Approved: ${title}`, 'success');
-      return;
-    }
-
-    if (action === 'later') {
-      removeItem(id);
-      showToast(`Saved for later — ${title}`, 'info');
-      return;
-    }
-
-    if (action === 'edit') {
-      showToast('Editor will open here when the draft API is connected.', 'info');
-      return;
-    }
-
-    if (action === 'details') {
-      showToast('Full details view — coming with API wiring.', 'info');
-    }
-  }
-
-  function confirmReject() {
-    if (!rejectTarget) {
-      return;
-    }
-    removeItem(rejectTarget.id);
-    showToast(`Rejected — ${rejectTarget.title}`, 'error');
-    setRejectTarget(null);
+    setRawItems((prev) => prev.filter((row) => String(row.id ?? row.Id) !== id));
+    showToast('Draft approved. In Content Studio, use Ready to publish to post or schedule.', 'success');
   }
 
   return (
@@ -88,53 +81,86 @@ export default function ApprovalQueueView() {
       <header className="ap-page-header">
         <h1 className="ap-page-title">Approval queue</h1>
         <p className="ap-page-lead">
-          Review what Onevo drafted. Approve, edit, or reject — nothing goes out without you.
+          LinkedIn drafts with status <strong>Draft</strong> appear here. Approve to move them to <strong>Approved</strong>,
+          then publish or schedule from Content Studio (Ready to publish).
         </p>
       </header>
 
-      <div className="ap-toolbar" role="toolbar" aria-label="Filter queue">
-        {FILTERS.map((f) => (
-          <button
-            key={f.id}
-            type="button"
-            className={`ap-filter ${filter === f.id ? 'active' : ''}`}
-            onClick={() => setFilter(f.id)}
-          >
-            {f.label}
-            {f.id === 'all' ? (
-              <span className="ap-filter-count">{queueItems.length}</span>
-            ) : f.id === 'urgent' ? (
-              <span className="ap-filter-count">{queueItems.filter((i) => i.urgency === 'high').length}</span>
-            ) : (
-              <span className="ap-filter-count">{queueItems.filter((i) => i.urgency === 'normal').length}</span>
-            )}
-          </button>
-        ))}
+      <div className="ap-toolbar" role="toolbar" aria-label="Queue actions">
+        <span className="ap-pending-label">
+          Pending
+          <span className="ap-filter-count" aria-live="polite">
+            {loading ? '…' : items.length}
+          </span>
+        </span>
+        <button type="button" className="ap-filter" onClick={() => void load()} disabled={loading}>
+          Refresh
+        </button>
       </div>
 
-      <div className="ap-queue">
-        {items.length === 0 ? (
-          <div className="db-empty">
-            <p>{queueItems.length === 0 ? 'Your queue is clear.' : 'Nothing in this view.'}</p>
-            <p className="db-empty-hint">
-              {queueItems.length === 0
-                ? 'New drafts will show up here when Onevo generates them.'
-                : 'Try another filter or check back when new drafts arrive.'}
-            </p>
-          </div>
-        ) : (
-          items.map((item) => (
-            <RecommendationCard key={item.id} item={item} onAction={(action) => handleAction(item.id, action)} />
-          ))
-        )}
-      </div>
+      {loading ? (
+        <p className="ap-status" role="status">
+          Loading approval queue…
+        </p>
+      ) : null}
 
-      <RejectDraftModal
-        open={!!rejectTarget}
-        title={rejectTarget?.title ?? ''}
-        onCancel={() => setRejectTarget(null)}
-        onConfirm={confirmReject}
-      />
+      {!loading && fetchError ? (
+        <p className="ap-error" role="alert">
+          {fetchError}
+        </p>
+      ) : null}
+
+      {!loading && !fetchError && approveError ? (
+        <p className="ap-error" role="alert">
+          {approveError}
+        </p>
+      ) : null}
+
+      {!loading && !fetchError && items.length === 0 ? (
+        <div className="db-empty">
+          <p>Nothing waiting for approval.</p>
+          <p className="db-empty-hint">
+            Create a LinkedIn draft in{' '}
+            <Link className="ap-inline-link" to="/app/dashboard/content-studio">
+              Content Studio
+            </Link>
+            . It will show up here until you approve it.
+          </p>
+        </div>
+      ) : null}
+
+      {!loading && !fetchError && items.length > 0 ? (
+        <div className="ap-queue">
+          {items.map((item) => (
+            <article key={item.id} className="ap-draft-card">
+              <div className="ap-draft-card__head">
+                <strong className="ap-draft-card__title">{item.title.trim() || 'Untitled'}</strong>
+                <span className="ap-draft-card__ch">{item.channel}</span>
+              </div>
+              {item.bodyPreview ? <p className="ap-draft-card__preview">{item.bodyPreview}</p> : null}
+              <p className="ap-draft-card__meta">
+                Created {formatWhen(item.createdAtUtc)} · Status: {formatContentStatusLabel(item.status)}
+              </p>
+              <div className="ap-draft-card__actions">
+                <button
+                  type="button"
+                  className="ap-draft-card__approve"
+                  onClick={() => void handleApprove(item.id)}
+                  disabled={approvingId === item.id}
+                >
+                  {approvingId === item.id ? 'Approving…' : 'Approve'}
+                </button>
+                <Link
+                  className="ap-inline-link"
+                  to={`/app/dashboard/content-studio?draft=${encodeURIComponent(item.id)}`}
+                >
+                  Open in Content Studio
+                </Link>
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
 
       <ToastAlert toast={toast} />
     </div>

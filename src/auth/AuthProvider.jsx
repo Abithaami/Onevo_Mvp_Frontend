@@ -41,10 +41,12 @@ export function AuthProvider({ children }) {
   const refreshSession = useCallback(async () => {
     setError(null);
     try {
+      // Never follow 302 to accounts.google.com — that breaks CORS under fetch; server returns 401 when logged out.
       const res = await fetch(googleSessionProbeUrl(), {
         method: 'GET',
         credentials: 'include',
         headers: { Accept: 'application/json' },
+        redirect: 'error',
       });
       if (res.status === 401) {
         setUser(null);
@@ -70,7 +72,8 @@ export function AuthProvider({ children }) {
     } catch {
       setUser(null);
       setStatus('anonymous');
-      setError('session_network');
+      // Probe failures are ambiguous (offline, TLS, legacy API redirect). Avoid the alarming banner; use Google sign-in to surface API issues.
+      setError(null);
     }
   }, []);
 

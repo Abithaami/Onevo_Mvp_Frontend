@@ -18,6 +18,7 @@ export function growthHasDataPath(growthData) {
       growthData.connectPos ||
       growthData.connectBooking ||
       growthData.fallbackExcelName?.trim() ||
+      growthData.fallbackCsvName?.trim() ||
       growthData.fallbackImageName?.trim(),
   );
 }

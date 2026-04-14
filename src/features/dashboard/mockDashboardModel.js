@@ -1,5 +1,5 @@
 /**
- * Mock dashboard payload for UI development — replace with API layer later.
+ * Mock payload for the legacy `DashboardView` prototype only (not used by the main dashboard overview).
  */
 
 import { getHandoffPayloadForModel } from './handoffSession.js';

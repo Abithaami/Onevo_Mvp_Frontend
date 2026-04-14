@@ -16,6 +16,8 @@ export const dashboardSidebarSections = [
     items: [
       { id: 'approval', abbr: 'AP', label: 'Approval', to: '/app/approval' },
       { id: 'integrations', abbr: 'IN', label: 'Integrations', to: '/app/integrations' },
+      { id: 'orchestrator', abbr: 'OR', label: 'Orchestrator', to: '/app/dashboard/orchestrator' },
+      { id: 'signals', abbr: 'SG', label: 'Signals', to: '/app/dashboard/signals' },
     ],
   },
   {
