@@ -7,6 +7,7 @@ import {
   formatSocialSelectionsSummary,
   formatWebsiteSourceLine,
 } from '../../features/dashboard/dashboardOverviewModel.js';
+import ApprovalQueueView from '../../features/approval/ApprovalQueueView.jsx';
 import CalendarPage from './sections/CalendarPage';
 import ContentStudioPage from './sections/ContentStudioPage.jsx';
 import NotificationsSection from './sections/NotificationsSection.jsx';
@@ -67,6 +68,9 @@ export default function DashboardWorkspaceContent({ setup, onSetupChange, onOpen
   }
   if (activeNav === 'published-posts') {
     return <PublishedPostsPage />;
+  }
+  if (activeNav === 'drafts') {
+    return <ApprovalQueueView />;
   }
   if (activeNav === 'notifications') {
     return <NotificationsSection />;

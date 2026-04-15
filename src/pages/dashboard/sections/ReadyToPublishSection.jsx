@@ -256,7 +256,7 @@ export default function ReadyToPublishSection({
                 <p className="content-studio-muted content-studio-ready-item__open">
                   <Link
                     className="content-studio-linklike"
-                    to={`/app/dashboard/content-studio?draft=${encodeURIComponent(row.id)}`}
+                    to={`/app/dashboard/content-studio?draftId=${encodeURIComponent(row.id)}`}
                   >
                     Open in Content Studio
                   </Link>{' '}

@@ -2338,6 +2338,22 @@ img {
   transform: translateY(-1px);
 }
 
+.onboarding-connection-card.is-disabled {
+  opacity: 0.52;
+}
+
+.onboarding-connection-card.is-disabled:hover {
+  border-color: var(--color-neutral-200);
+  box-shadow: none;
+  transform: none;
+}
+
+.onboarding-connection-card button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.25);
+}
+
 .onboarding-connection-top {
   display: flex;
   align-items: center;
@@ -3611,6 +3627,20 @@ a.dashboard-rail-item {
   color: var(--color-neutral-600);
   font-size: var(--text-sm);
   line-height: 1.55;
+}
+
+/* Full main-column placeholder for standalone routes (e.g. /app/analytics) */
+.analytics-page-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: min(72vh, 720px);
+  padding: var(--space-8) var(--space-4);
+}
+
+.analytics-page-placeholder .dashboard-placeholder {
+  max-width: 28rem;
+  width: 100%;
 }
 
 /* —— Dashboard calendar (landing palette: teal, coral accent, soft neutrals) —— */

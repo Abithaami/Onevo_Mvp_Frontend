@@ -1289,6 +1289,7 @@ export default function OnboardingFlow() {
               ].map((ch) => {
                 const connected = state[ch.key];
                 const connecting = state.socialConnectingId === ch.id;
+                const isComingSoon = true;
                 return (
                   <div key={ch.id} className="onboarding-mvp-social-row">
                     <span>{ch.label}</span>
@@ -1296,6 +1297,7 @@ export default function OnboardingFlow() {
                       type="button"
                       className="onboarding-btn onboarding-btn--secondary"
                       disabled={
+                        isComingSoon ||
                         connected ||
                         (Boolean(state.socialConnectingId) && !connecting) ||
                         linkedinStatusLoading ||
@@ -1303,6 +1305,9 @@ export default function OnboardingFlow() {
                         linkedinDisconnectBusy
                       }
                       onClick={() => {
+                        if (isComingSoon) {
+                          return;
+                        }
                         setState((s) => ({ ...s, socialConnectingId: ch.id }));
                         /* MOCK: demo only — not real OAuth. */
                         window.setTimeout(() => {
@@ -1314,7 +1319,7 @@ export default function OnboardingFlow() {
                         }, 700);
                       }}
                     >
-                      {connecting ? 'Connecting…' : connected ? 'Connected' : 'Connect'}
+                      {isComingSoon ? 'Coming soon' : connecting ? 'Connecting…' : connected ? 'Connected' : 'Connect'}
                     </button>
                   </div>
                 );

@@ -21,8 +21,26 @@ export default function AuthPage() {
   const prevPathRef = useRef(null);
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const googleLoginReturnUrl = `${origin}/app/dashboard`;
-  const googleRegisterReturnUrl = `${origin}/app/onboarding`;
+  const normalizedOrigin = (() => {
+    if (!origin) {
+      return import.meta.env.DEV ? 'http://localhost:5173' : '';
+    }
+    try {
+      const current = new URL(origin);
+      const isLoopback = current.hostname === '127.0.0.1' || current.hostname === 'localhost';
+      if (import.meta.env.DEV && isLoopback) {
+        // Match the host the SPA was opened on (localhost vs 127.0.0.1) so returnUrl aligns with Google + API allowlists.
+        return current.origin;
+      }
+    } catch {
+      if (import.meta.env.DEV) {
+        return 'http://localhost:5173';
+      }
+    }
+    return origin;
+  })();
+  const googleLoginReturnUrl = `${normalizedOrigin}/app/dashboard`;
+  const googleRegisterReturnUrl = `${normalizedOrigin}/app/onboarding`;
 
   function showToast(message, type = 'info') {
     setToast({ message, type });

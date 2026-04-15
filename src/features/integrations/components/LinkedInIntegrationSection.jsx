@@ -147,30 +147,22 @@ export default function LinkedInIntegrationSection() {
       ) : null}
 
       <div className="int-card-actions int-linkedin-panel__actions">
-        {liveConnected ? (
-          <>
-            <button
-              type="button"
-              className="int-btn int-btn--primary"
-              disabled={busy}
-              onClick={() => void handleConnect()}
-            >
-              {connectBusy ? 'Redirecting…' : 'Reconnect'}
-            </button>
-            <button
-              type="button"
-              className="int-btn int-btn--ghost"
-              disabled={busy}
-              onClick={() => void handleDisconnect()}
-            >
-              {disconnectBusy ? 'Disconnecting…' : 'Disconnect'}
-            </button>
-          </>
-        ) : (
-          <button type="button" className="int-btn int-btn--primary" disabled={busy} onClick={() => void handleConnect()}>
-            {connectBusy ? 'Redirecting…' : 'Connect LinkedIn'}
-          </button>
-        )}
+        <button
+          type="button"
+          className={`int-btn ${liveConnected ? 'int-btn--ghost' : 'int-btn--primary'}`}
+          disabled={busy}
+          onClick={liveConnected ? () => void handleDisconnect() : () => void handleConnect()}
+        >
+          {loading
+            ? 'Checking…'
+            : liveConnected
+              ? disconnectBusy
+                ? 'Disconnecting…'
+                : 'Disconnect LinkedIn'
+              : connectBusy
+                ? 'Redirecting…'
+                : 'Connect LinkedIn'}
+        </button>
       </div>
     </section>
   );

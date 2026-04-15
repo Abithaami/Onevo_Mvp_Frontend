@@ -1,4 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  fetchPendingApprovalDrafts,
+  fetchPublishedPosts,
+  fetchReadyToPublishDrafts,
+  mapPendingApprovalDraftRow,
+  mapPublishedPostRow,
+  mapReadyToPublishDraftRow,
+} from '../../../features/content/contentDraftsApi.js';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -14,28 +22,6 @@ const FILTERS = [
   { id: 'scheduled', label: 'Scheduled' },
   { id: 'published', label: 'Published' },
 ];
-
-/** Demo posts for a few days each month (MVP preview). */
-function buildDemoPosts(year, monthIndex) {
-  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
-  const posts = {};
-  const plan = [
-    [3, 'draft'],
-    [5, 'scheduled'],
-    [7, 'published'],
-    [11, 'draft'],
-    [14, 'scheduled'],
-    [18, 'published'],
-    [21, 'draft'],
-    [24, 'scheduled'],
-    [27, 'published'],
-  ];
-  plan.forEach(([d, status], i) => {
-    if (d > lastDay) return;
-    posts[d] = [{ id: `p-${i}`, status }];
-  });
-  return posts;
-}
 
 function buildGridCells(year, monthIndex) {
   const firstWeekday = new Date(year, monthIndex, 1).getDay();
@@ -56,11 +42,33 @@ function buildGridCells(year, monthIndex) {
   return cells;
 }
 
+function isInMonth(isoLike, year, monthIndex) {
+  if (!isoLike) return false;
+  const d = new Date(isoLike);
+  return !Number.isNaN(d.getTime()) && d.getUTCFullYear() === year && d.getUTCMonth() === monthIndex;
+}
+
+function getUtcDay(isoLike) {
+  const d = new Date(isoLike);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.getUTCDate();
+}
+
+function formatWhen(isoLike) {
+  if (!isoLike) return '—';
+  const d = new Date(isoLike);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
 export default function CalendarPage() {
   const now = new Date();
   const [view, setView] = useState(() => new Date(now.getFullYear(), now.getMonth(), 1));
   const [filter, setFilter] = useState('all');
   const [selectedDay, setSelectedDay] = useState(() => now.getDate());
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const year = view.getFullYear();
   const monthIndex = view.getMonth();
@@ -73,7 +81,90 @@ export default function CalendarPage() {
     [year, monthIndex],
   );
 
-  const postsByDay = useMemo(() => buildDemoPosts(year, monthIndex), [year, monthIndex]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    let firstError = '';
+    const [drafts, ready, published] = await Promise.all([
+      fetchPendingApprovalDrafts(),
+      fetchReadyToPublishDrafts(),
+      fetchPublishedPosts(),
+    ]);
+
+    const next = [];
+
+    if (drafts.ok) {
+      for (const row of drafts.items.map(mapPendingApprovalDraftRow)) {
+        if (!row?.id || !row.createdAtUtc) continue;
+        next.push({
+          id: row.id,
+          title: row.title || 'Untitled',
+          status: 'draft',
+          whenUtc: row.createdAtUtc,
+        });
+      }
+    } else {
+      firstError = firstError || drafts.error;
+    }
+
+    if (ready.ok) {
+      for (const row of ready.items.map(mapReadyToPublishDraftRow)) {
+        if (!row?.id || String(row.status).toLowerCase() !== 'scheduled') continue;
+        const whenUtc = row.scheduledPublishAtUtc ?? row.updatedAtUtc ?? row.createdAtUtc;
+        if (!whenUtc) continue;
+        next.push({
+          id: row.id,
+          title: row.title || 'Untitled',
+          status: 'scheduled',
+          whenUtc,
+        });
+      }
+    } else {
+      firstError = firstError || ready.error;
+    }
+
+    if (published.ok) {
+      for (const row of published.items.map(mapPublishedPostRow)) {
+        if (!row?.id || !row.publishedAtUtc) continue;
+        next.push({
+          id: row.id,
+          title: row.title || 'Untitled',
+          status: 'published',
+          whenUtc: row.publishedAtUtc,
+        });
+      }
+    } else {
+      firstError = firstError || published.error;
+    }
+
+    setItems(next);
+    setError(firstError);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const postsByDay = useMemo(() => {
+    /** @type {Record<number, Array<{id:string,title:string,status:'draft'|'scheduled'|'published',whenUtc:string}>>} */
+    const byDay = {};
+    for (const item of items) {
+      if (!isInMonth(item.whenUtc, year, monthIndex)) continue;
+      const day = getUtcDay(item.whenUtc);
+      if (!day) continue;
+      byDay[day] ??= [];
+      byDay[day].push(item);
+    }
+    return byDay;
+  }, [items, year, monthIndex]);
+
+  const selectedDayItems = useMemo(() => {
+    const list = postsByDay[selectedDay] ?? [];
+    if (filter === 'all') return list;
+    return list.filter((x) => x.status === filter);
+  }, [postsByDay, selectedDay, filter]);
+
   const cells = useMemo(() => buildGridCells(year, monthIndex), [year, monthIndex]);
 
   useEffect(() => {
@@ -89,7 +180,7 @@ export default function CalendarPage() {
     setView((v) => new Date(v.getFullYear(), v.getMonth() + delta, 1));
   }
 
-  function visiblePosts(day, list) {
+  function visiblePosts(list) {
     if (!list?.length) return [];
     if (filter === 'all') return list;
     return list.filter((p) => p.status === filter);
@@ -117,6 +208,15 @@ export default function CalendarPage() {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            className="dashboard-calendar__select"
+            onClick={() => void load()}
+            disabled={loading}
+            aria-label="Refresh calendar data"
+          >
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </button>
           <div className="dashboard-calendar__month-wrap">
             <button
               type="button"
@@ -144,6 +244,12 @@ export default function CalendarPage() {
           </div>
         </div>
       </header>
+
+      {error ? (
+        <p className="content-studio-error" role="alert">
+          {error}
+        </p>
+      ) : null}
 
       <ul className="dashboard-calendar__legend" aria-label="Post status legend">
         {LEGEND.map((item) => (
@@ -173,7 +279,7 @@ export default function CalendarPage() {
             }
             const { day } = cell;
             const raw = postsByDay[day] || [];
-            const list = visiblePosts(day, raw);
+            const list = visiblePosts(raw);
             const isToday = isTodayMonth && day === todayDate;
             const isSelected = day === selectedDay;
             const altBand = day % 10 === 1;
@@ -224,6 +330,27 @@ export default function CalendarPage() {
             );
           })}
         </div>
+      </div>
+
+      <div className="content-studio-panel content-studio-panel--card" style={{ marginTop: '1rem' }}>
+        <h2 className="content-studio-panel__title">Selected day details</h2>
+        {selectedDayItems.length === 0 ? (
+          <p className="content-studio-muted">No matching items for this day and filter.</p>
+        ) : (
+          <ul className="content-studio-list">
+            {selectedDayItems.map((item) => (
+              <li key={`${item.status}-${item.id}-${item.whenUtc}`} className="content-studio-list__item">
+                <div>
+                  <strong>{item.title}</strong>
+                  <p className="content-studio-muted">{formatWhen(item.whenUtc)}</p>
+                </div>
+                <span className="content-studio-muted" style={{ textTransform: 'capitalize' }}>
+                  {item.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

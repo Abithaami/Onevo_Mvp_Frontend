@@ -14,9 +14,27 @@ function formatWhen(iso) {
 }
 
 /**
- * @param {{ items: unknown[], loading: boolean, error: string, emptyHint?: string }} props
+ * @param {{
+ *   items: unknown[],
+ *   loading: boolean,
+ *   error: string,
+ *   linkedInLiveAnalyticsAllowed?: boolean,
+ *   linkedInAnalyticsDisabledReason?: string,
+ *   linkedInAnalyticsComingSoon?: boolean,
+ *   onLinkedInPostHidden?: () => void,
+ *   emptyHint?: string,
+ * }} props
  */
-export default function PublishedPostsList({ items, loading, error, emptyHint }) {
+export default function PublishedPostsList({
+  items,
+  loading,
+  error,
+  linkedInLiveAnalyticsAllowed = false,
+  linkedInAnalyticsDisabledReason = '',
+  linkedInAnalyticsComingSoon = false,
+  onLinkedInPostHidden,
+  emptyHint,
+}) {
   const rows = (items ?? []).map(mapPublishedPostRow).filter(Boolean);
 
   if (loading) {
@@ -64,14 +82,21 @@ export default function PublishedPostsList({ items, loading, error, emptyHint })
           <p className="content-studio-muted content-studio-published-item__view">
             <Link
               className="content-studio-linklike"
-              to={`/app/dashboard/content-studio?draft=${encodeURIComponent(r.id)}`}
+              to={`/app/dashboard/content-studio?draftId=${encodeURIComponent(r.id)}`}
             >
               View full copy in Content Studio
             </Link>{' '}
             (read-only — already published)
           </p>
           {r.channel?.toLowerCase() === 'linkedin' ? (
-            <PublishedPostLinkedInExtras contentItemId={r.id} linkedInPostUrn={r.linkedInPostUrn ? String(r.linkedInPostUrn) : null} />
+            <PublishedPostLinkedInExtras
+              contentItemId={r.id}
+              linkedInPostUrn={r.linkedInPostUrn ? String(r.linkedInPostUrn) : null}
+              linkedInLiveAnalyticsAllowed={linkedInLiveAnalyticsAllowed}
+              analyticsDisabledReason={linkedInAnalyticsDisabledReason}
+              analyticsComingSoon={linkedInAnalyticsComingSoon}
+              onPostHidden={onLinkedInPostHidden}
+            />
           ) : null}
         </li>
       ))}

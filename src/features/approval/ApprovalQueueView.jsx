@@ -152,7 +152,7 @@ export default function ApprovalQueueView() {
                 </button>
                 <Link
                   className="ap-inline-link"
-                  to={`/app/dashboard/content-studio?draft=${encodeURIComponent(item.id)}`}
+                  to={`/app/dashboard/content-studio?draftId=${encodeURIComponent(item.id)}`}
                 >
                   Open in Content Studio
                 </Link>

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { apiUrl, googleSessionProbeUrl } from '../lib/apiBase.js';
+import { googleLogoutUrl, googleSessionProbeUrl } from '../lib/apiBase.js';
 import { clearWorkspaceOnlyAfterLogout, signOutClientSession } from '../features/onboarding/onboardingStorage.js';
 
 /**
@@ -12,8 +12,31 @@ import { clearWorkspaceOnlyAfterLogout, signOutClientSession } from '../features
 /** @type {React.Context<{ status: 'loading' | 'anonymous' | 'authenticated', user: AuthUser | null, error: string | null, refreshSession: () => Promise<void>, logout: (opts?: LogoutOptions) => Promise<void> } | null>} */
 const AuthContext = createContext(null);
 
+function delay(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+/** In dev, tolerate backend / proxy starting slightly after Vite. */
+const devSessionProbeMaxAttempts = 15;
+const devSessionProbeDelayMs = 400;
+
+function shouldRetryDevSessionProbe(attempt, response, hadNetworkError) {
+  if (!import.meta.env.DEV || attempt >= devSessionProbeMaxAttempts) {
+    return false;
+  }
+  if (hadNetworkError) {
+    return true;
+  }
+  if (!response) {
+    return false;
+  }
+  return response.status === 502 || response.status === 503 || response.status === 504;
+}
+
 async function postLogout() {
-  const res = await fetch(apiUrl('/api/auth/google/logout'), {
+  const res = await fetch(googleLogoutUrl(), {
     method: 'POST',
     credentials: 'include',
     headers: { Accept: 'application/json' },
@@ -40,40 +63,61 @@ export function AuthProvider({ children }) {
 
   const refreshSession = useCallback(async () => {
     setError(null);
-    try {
-      // Never follow 302 to accounts.google.com — that breaks CORS under fetch; server returns 401 when logged out.
-      const res = await fetch(googleSessionProbeUrl(), {
-        method: 'GET',
-        credentials: 'include',
-        headers: { Accept: 'application/json' },
-        redirect: 'error',
-      });
+    for (let attempt = 1; attempt <= devSessionProbeMaxAttempts; attempt += 1) {
+      let res;
+      let hadNetworkError = false;
+      try {
+        res = await fetch(googleSessionProbeUrl(), {
+          method: 'GET',
+          credentials: 'include',
+          headers: { Accept: 'application/json' },
+        });
+      } catch {
+        hadNetworkError = true;
+        if (shouldRetryDevSessionProbe(attempt, undefined, true)) {
+          await delay(devSessionProbeDelayMs);
+          continue;
+        }
+        setUser(null);
+        setStatus('anonymous');
+        setError('session_network');
+        return;
+      }
+
       if (res.status === 401) {
         setUser(null);
         setStatus('anonymous');
         return;
       }
+
       if (!res.ok) {
+        if (shouldRetryDevSessionProbe(attempt, res, false)) {
+          await delay(devSessionProbeDelayMs);
+          continue;
+        }
         setUser(null);
         setStatus('anonymous');
         setError(`session_http_${res.status}`);
         return;
       }
-      const json = await res.json();
-      const parsed = parseSessionUser(json);
-      if (!parsed?.userId) {
+
+      try {
+        const json = await res.json();
+        const parsed = parseSessionUser(json);
+        if (!parsed?.userId) {
+          setUser(null);
+          setStatus('anonymous');
+          setError('session_invalid_payload');
+          return;
+        }
+        setUser(parsed);
+        setStatus('authenticated');
+      } catch {
         setUser(null);
         setStatus('anonymous');
         setError('session_invalid_payload');
-        return;
       }
-      setUser(parsed);
-      setStatus('authenticated');
-    } catch {
-      setUser(null);
-      setStatus('anonymous');
-      // Probe failures are ambiguous (offline, TLS, legacy API redirect). Avoid the alarming banner; use Google sign-in to surface API issues.
-      setError(null);
+      return;
     }
   }, []);
 

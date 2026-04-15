@@ -93,6 +93,40 @@ export function mapSpecialistHandoffResult(json) {
 /**
  * @param {unknown} json
  */
+function mapGeneratedLinkedInPreview(json) {
+  if (!json || typeof json !== 'object') {
+    return {
+      contentPlan: { hook: '', message: '', cta: '' },
+      caption: '',
+      hashtags: [],
+      imageUrl: '',
+    };
+  }
+  const o = /** @type {Record<string, unknown>} */ (json);
+  const rawPlan = pick(o, 'contentPlan', 'ContentPlan');
+  const plan = rawPlan && typeof rawPlan === 'object' ? /** @type {Record<string, unknown>} */ (rawPlan) : {};
+  const hashtagsRaw = pick(o, 'hashtags', 'Hashtags');
+  const tags = Array.isArray(hashtagsRaw)
+    ? hashtagsRaw
+        .map((x) => String(x ?? '').trim())
+        .filter(Boolean)
+        .map((x) => (x.startsWith('#') ? x : `#${x}`))
+    : [];
+  return {
+    contentPlan: {
+      hook: String(pick(plan, 'hook', 'Hook') ?? ''),
+      message: String(pick(plan, 'message', 'Message') ?? ''),
+      cta: String(pick(plan, 'cta', 'Cta') ?? ''),
+    },
+    caption: String(pick(o, 'caption', 'Caption') ?? ''),
+    hashtags: tags,
+    imageUrl: String(pick(o, 'imageUrl', 'ImageUrl') ?? ''),
+  };
+}
+
+/**
+ * @param {unknown} json
+ */
 export function mapOrchestrationWorkflowResponse(json) {
   if (!json || typeof json !== 'object') {
     return {
@@ -109,6 +143,12 @@ export function mapOrchestrationWorkflowResponse(json) {
       handoffs: [],
       finalOrchestratorResponse: null,
       orchestratorLearningSummaryJson: null,
+      generatedLinkedInPreview: {
+        contentPlan: { hook: '', message: '', cta: '' },
+        caption: '',
+        hashtags: [],
+        imageUrl: '',
+      },
     };
   }
   const o = /** @type {Record<string, unknown>} */ (json);
@@ -116,6 +156,7 @@ export function mapOrchestrationWorkflowResponse(json) {
   const hf = pick(o, 'handoffs', 'Handoffs');
   const fo = pick(o, 'finalOrchestratorResponse', 'FinalOrchestratorResponse');
   const ol = pick(o, 'orchestratorLearningSummaryJson', 'OrchestratorLearningSummaryJson');
+  const gp = pick(o, 'generatedLinkedInPreview', 'GeneratedLinkedInPreview');
   const emptyPlan = {
     summary: '',
     primaryHandoff: { agentName: '', rationale: '' },
@@ -131,6 +172,7 @@ export function mapOrchestrationWorkflowResponse(json) {
     handoffs: Array.isArray(hf) ? hf.map(mapSpecialistHandoffResult) : [],
     finalOrchestratorResponse: fo != null && fo !== '' ? String(fo) : null,
     orchestratorLearningSummaryJson: ol != null && ol !== '' ? String(ol) : null,
+    generatedLinkedInPreview: mapGeneratedLinkedInPreview(gp),
   };
 }
 

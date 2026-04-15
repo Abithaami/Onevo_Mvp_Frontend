@@ -7,6 +7,16 @@ const raw = import.meta.env.VITE_API_BASE_URL?.trim() ?? '';
 
 export const apiOrigin = raw.replace(/\/$/, '');
 
+/** Same-origin as Vite `server.proxy['/api'].target` (OAuth correlation cookies live on the API host). */
+function devApiOrigin() {
+  const fromEnv =
+    import.meta.env.VITE_DEV_API_ORIGIN?.trim() || import.meta.env.VITE_DEV_PROXY_TARGET?.trim();
+  if (fromEnv) {
+    return fromEnv.replace(/\/$/, '');
+  }
+  return 'https://localhost:7000';
+}
+
 /**
  * @param {string} path - Absolute path beginning with `/` (e.g. `/api/auth/google/login`)
  */
@@ -25,7 +35,7 @@ export function googleSessionProbeUrl() {
 
 /**
  * Full URL to start Google OAuth. Must hit the API origin directly so correlation cookies for /signin-google
- * are stored on https://localhost:7000. Using Vite's /api proxy stores cookies on the dev server origin and causes
+ * are stored on the API host (see `VITE_DEV_API_ORIGIN` / vite proxy). Using Vite's /api proxy stores cookies on the dev server origin and causes
  * "The oauth state was missing or invalid" after Google returns.
  *
  * @param {string} [absoluteReturnUrl] - Optional absolute browser URL for the API `returnUrl` query (validated server-side).
@@ -36,7 +46,7 @@ export function googleOAuthLoginUrl(absoluteReturnUrl) {
   if (explicit) {
     base = `${explicit.replace(/\/$/, '')}/api/auth/google/login`;
   } else if (import.meta.env.DEV) {
-    base = 'https://localhost:7000/api/auth/google/login';
+    base = `${devApiOrigin()}/api/auth/google/login`;
   } else {
     base = '/api/auth/google/login';
   }
@@ -46,4 +56,8 @@ export function googleOAuthLoginUrl(absoluteReturnUrl) {
   }
   const sep = base.includes('?') ? '&' : '?';
   return `${base}${sep}returnUrl=${encodeURIComponent(ret)}`;
+}
+
+export function googleLogoutUrl() {
+  return apiUrl('/api/auth/google/logout');
 }
